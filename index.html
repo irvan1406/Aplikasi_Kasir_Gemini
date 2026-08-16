@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KASIR VAN - PREMIUM</title>
+    <!-- Import Font Modern dari Google -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body>
+    <!-- Topbar Modern Glassmorphism -->
+    <header class="app-header">
+        <div class="logo-wrapper">
+            <div class="logo-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+            </div>
+            <h1>WarungScan</h1>
+        </div>
+        <div class="header-actions">
+            <span class="status-indicator"></span>
+            <button onclick="switchTab('page-pengaturan')" class="btn-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Halaman Beranda -->
+    <main id="page-home" class="page active">
+        <div class="hero-section">
+            <p class="greeting">Selamat datang,</p>
+            <h2 class="user-name">Irvan Maulana</h2>
+        </div>
+
+        <div class="menu-grid">
+            <div class="menu-card card-primary" onclick="actionScan()">
+                <div class="icon-circle">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 12h8"/></svg>
+                </div>
+                <h3>Scan Barcode</h3>
+            </div>
+            <div class="menu-card card-outline" onclick="actionCariBarang()">
+                <div class="icon-circle text-dark">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </div>
+                <h3>Cari Barang</h3>
+            </div>
+            <div class="menu-card card-outline" onclick="actionDaftarBarang()">
+                <div class="icon-circle text-dark">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                </div>
+                <h3>Daftar Barang</h3>
+            </div>
+            <div class="menu-card card-outline" onclick="actionTambahBarang()">
+                <div class="icon-circle text-dark">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </div>
+                <h3>Tambah Barang</h3>
+            </div>
+            <div class="menu-card card-accent" onclick="actionPos()">
+                <div class="icon-circle text-dark">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                </div>
+                <h3>Kasir / POS</h3>
+            </div>
+            <!-- Tombol Riwayat dipindah ke Beranda -->
+            <div class="menu-card card-outline" onclick="actionRiwayat()">
+                <div class="icon-circle text-dark">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                </div>
+                <h3>Riwayat & Laporan</h3>
+            </div>
+        </div>
+
+        <div class="stats-container">
+            <div class="stat-item">
+                <h3 id="stat-barang" class="text-primary">0</h3>
+                <p>Total Barang</p>
+            </div>
+            <div class="stat-item">
+                <h3 id="stat-menipis" class="text-warning">0</h3>
+                <p>Stok Menipis</p>
+            </div>
+            <div class="stat-item">
+                <h3 id="stat-habis" class="text-danger">0</h3>
+                <p>Stok Habis</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Halaman Kasir / POS -->
+    <main id="page-kasir" class="page">
+        <div class="page-header" onclick="goToHome()">
+            <button class="btn-back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button> 
+            <h2>Mesin Kasir</h2>
+        </div>
+
+        <div class="card-container">
+            <div id="reader" class="scanner-box"></div>
+            
+            <div class="flex-row" style="margin-top: 16px; gap: 10px;">
+                <button id="btn-start-scan" onclick="startScanner()" class="btn-primary" style="flex: 2;">Mulai Scan</button>
+                <button id="btn-stop-scan" onclick="stopScanner()" class="btn-danger" style="display: none; flex: 2;">Stop Scan</button>
+                
+                <!-- Fitur Scan dari Foto/Galeri -->
+                <button onclick="document.getElementById('barcode-file-input').click()" class="btn-outline" style="flex: 1;" title="Scan dari Foto Galeri">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                </button>
+                <input type="file" id="barcode-file-input" accept="image/*" style="display: none;" onchange="scanBarcodeFromFile(this)">
+            </div>
+        </div>
+
+        <div class="card-container">
+            <div class="search-box">
+                <input type="text" id="manual-barcode" class="modern-input" placeholder="Cari barcode / nama barang..." oninput="cariBarangKasir()">
+                <button onclick="addManualBarcode()" class="btn-accent">Tambah</button>
+            </div>
+            <ul id="kasir-search-results" class="dropdown-list" style="display: none;"></ul>
+        </div>
+
+        <div class="card-container no-padding">
+            <h3 class="section-title" style="padding: 16px 16px 0 16px;">Keranjang Belanja</h3>
+            <ul id="cart-list" class="item-list"></ul>
+        </div>
+
+        <div class="checkout-footer">
+            <div class="total-wrap">
+                <span>Total Bayar</span>
+                <span id="cart-total" class="total-amount">Rp 0</span>
+            </div>
+            <button class="btn-checkout" onclick="openPaymentModal()">PROSES PEMBAYARAN</button>
+        </div>
+    </main>
+
+    <!-- Halaman Barang -->
+    <main id="page-barang" class="page">
+        <div class="page-header" onclick="goToHome()">
+            <button class="btn-back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button> 
+            <h2 id="title-barang">Manajemen Barang</h2>
+        </div>
+
+        <div class="card-container" id="admin-form" style="display: none;">
+            
+            <label class="input-label">Foto Produk</label>
+            <div class="photo-upload-group">
+                <button type="button" class="btn-outline" onclick="document.getElementById('native-camera-input').click()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Jepret
+                </button>
+                <input type="file" id="native-camera-input" accept="image/*" capture="environment" style="display: none;" onchange="handleProductPhoto(this)">
+
+                <button type="button" class="btn-outline" onclick="document.getElementById('native-gallery-input').click()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Galeri
+                </button>
+                <input type="file" id="native-gallery-input" accept="image/*" style="display: none;" onchange="handleProductPhoto(this)">
+            </div>
+            <div id="preview-foto-barang" class="photo-preview">
+                <img id="img-preview-barang" src="">
+            </div>
+
+            <label class="input-label">Barcode</label>
+            <div class="search-box">
+                <input type="text" id="input-barcode" class="modern-input" placeholder="Scan / ketik barcode">
+                <button type="button" class="btn-light" onclick="document.getElementById('barcode-file-input').click()">Scan</button>
+            </div>
+
+            <label class="input-label">Nama Barang <span class="required">*</span></label>
+            <input type="text" id="input-nama" class="modern-input" placeholder="Misal: Indomie Goreng">
+
+            <div class="flex-row">
+                <div class="flex-col">
+                    <label class="input-label">Harga Beli <span class="required">*</span></label>
+                    <input type="number" id="input-harga-beli" class="modern-input" placeholder="0">
+                </div>
+                <div class="flex-col">
+                    <label class="input-label">Harga Jual <span class="required">*</span></label>
+                    <input type="number" id="input-harga" class="modern-input" placeholder="0">
+                </div>
+            </div>
+
+            <div class="flex-row">
+                <div class="flex-col">
+                    <label class="input-label">Stok <span class="required">*</span></label>
+                    <input type="number" id="input-stok" class="modern-input" placeholder="0">
+                </div>
+                <div class="flex-col">
+                    <label class="input-label">Satuan <span class="required">*</span></label>
+                    <input type="text" id="input-satuan" class="modern-input" placeholder="Pcs, Pack">
+                </div>
+            </div>
+
+            <button onclick="simpanBarang()" class="btn-primary" style="width: 100%; margin-top: 10px;">Simpan Barang</button>
+        </div>
+
+        <div class="card-container no-padding" id="section-daftar-barang">
+            <div class="section-header-flex">
+                <h3 class="section-title" style="margin: 0;">Katalog</h3>
+                <button onclick="toggleAdminMode()" id="btn-admin-toggle" class="btn-pill-light">Mode Edit: OFF</button>
+            </div>
+            <div style="padding: 0 16px 16px 16px;">
+                <input type="text" id="search-input" class="modern-input" placeholder="Cari nama / barcode..." oninput="renderProducts()">
+            </div>
+            <ul id="product-list" class="item-list"></ul>
+        </div>
+    </main>
+
+    <!-- Halaman Riwayat & Rekap -->
+    <main id="page-riwayat" class="page">
+        <div class="page-header" onclick="goToHome()">
+            <button class="btn-back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button> 
+            <h2>Riwayat & Laporan</h2>
+        </div>
+
+        <!-- Rekap Pendapatan Hari Ini -->
+        <div class="card-container report-box" style="background: var(--brand-primary); color: white;">
+            <h3 style="color: white; font-size: 14px; opacity: 0.9; margin-bottom: 4px;">Pendapatan Hari Ini</h3>
+            <h2 id="report-today-revenue" style="font-size: 28px; font-weight: 800; margin-bottom: 12px;">Rp 0</h2>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px;">
+                <span>Total Transaksi</span>
+                <strong id="report-today-trx">0 trx</strong>
+            </div>
+        </div>
+
+        <div class="card-container no-padding">
+            <div class="section-header-flex">
+                <h3 class="section-title" style="margin: 0;">Daftar Transaksi</h3>
+                <button onclick="hapusSemuaRiwayat()" class="btn-pill-light" style="color: var(--brand-danger);">Kosongkan</button>
+            </div>
+            <ul id="history-list" class="item-list"></ul>
+        </div>
+    </main>
+
+    <!-- Halaman Pengaturan -->
+    <main id="page-pengaturan" class="page">
+        <div class="page-header" onclick="goToHome()">
+            <button class="btn-back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></button> 
+            <h2>Pengaturan Aplikasi</h2>
+        </div>
+        
+        <div class="card-container">
+            <h3 class="section-title" style="margin-bottom: 16px;">Koneksi Perangkat</h3>
+            <button onclick="requestCameraPermission()" class="btn-outline" style="width: 100%; margin-bottom: 12px; justify-content: center;">📷 Izinkan Akses Kamera</button>
+            <button onclick="connectBluetoothPrinter()" class="btn-primary" style="width: 100%; margin-bottom: 12px;">🖨️ Konek Printer Bluetooth</button>
+            <div id="status-printer" class="status-badge status-offline">Printer Belum Terhubung</div>
+        </div>
+
+        <div class="card-container" style="margin-top: 16px;">
+            <h3 class="section-title" style="margin-bottom: 16px;">Format Struk</h3>
+            
+            <div class="flex-row" style="align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                <span style="font-weight: 500;">Print Otomatis?</span>
+                <select id="setting-autoprint" class="modern-input" style="width: 120px; margin: 0;" onchange="saveSettings()">
+                    <option value="false">Manual</option>
+                    <option value="true">Otomatis</option>
+                </select>
+            </div>
+
+            <label class="input-label">Nama Toko (Header)</label>
+            <input type="text" id="template-header" class="modern-input" placeholder="WARUNGSCAN" oninput="saveSettings()">
+
+            <label class="input-label">Catatan Bawah (Footer)</label>
+            <input type="text" id="template-footer" class="modern-input" placeholder="Terima Kasih" oninput="saveSettings()">
+
+            <label class="input-label">Logo Toko (Monokrom)</label>
+            <div class="photo-upload-group">
+                <button type="button" class="btn-outline" onclick="document.getElementById('setting-logo').click()">Pilih Logo</button>
+                <input type="file" id="setting-logo" accept="image/*" style="display: none;" onchange="handleLogoUpload()">
+                <button type="button" onclick="hapusLogo()" class="btn-danger" style="flex: 0.5;">Hapus</button>
+            </div>
+            
+            <div class="photo-preview" id="preview-logo-container" style="display: none; justify-content: center;">
+                <img id="preview-logo" src="" style="max-width: 120px;">
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Pembayaran (Modern Dialog) -->
+    <div id="payment-modal" class="modal-backdrop">
+        <div class="modal-dialog">
+            <h3 class="modal-title">Selesaikan Pembayaran</h3>
+            
+            <div class="payment-total-box">
+                <span>Total Tagihan</span>
+                <strong id="modal-total-belanja">Rp 0</strong>
+            </div>
+
+            <label class="input-label">Uang Diterima</label>
+            <input type="number" id="input-tunai" class="modern-input huge-input" placeholder="0" oninput="hitungKembalian()">
+            
+            <div class="payment-change-box">
+                <span>Kembalian</span>
+                <strong id="modal-kembalian">Rp 0</strong>
+            </div>
+
+            <div class="modal-actions">
+                <button onclick="closePaymentModal()" class="btn-light">Batal</button>
+                <button onclick="prosesKePreview()" class="btn-primary">Proses</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Preview Struk -->
+    <div id="preview-modal" class="modal-backdrop">
+        <div class="modal-dialog">
+            <h3 class="modal-title">Pratinjau Struk</h3>
+            <p class="modal-subtitle">Anda dapat mengedit teks sebelum dicetak.</p>
+            
+            <textarea id="print-text-preview" rows="12" class="receipt-textarea"></textarea>
+            
+            <div class="modal-actions">
+                <button onclick="closePreviewModal()" class="btn-light">Selesai (Lewati Cetak)</button>
+                <button onclick="executePrint()" class="btn-primary">Cetak Struk</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Area Print Fallback (Disembunyikan) -->
+    <div id="print-area">
+        <img id="print-area-logo" src="" style="width: 100%; max-width: 200px; display: none; margin: 0 auto;">
+        <pre id="print-raw-text"></pre>
+    </div>
+
+    <script src="database.js"></script>
+    <script src="printer-bluetooth.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
