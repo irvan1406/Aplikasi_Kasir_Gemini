@@ -176,7 +176,6 @@ function startScanner() {
     document.getElementById('btn-stop-scan').style.display = 'block';
 
     html5QrcodeScanner = new Html5Qrcode("reader");
-    // Hardcode: Kamera belakang murni, FPS 15 untuk optimasi HP
     html5QrcodeScanner.start(
         { facingMode: "environment" },
         { fps: 15, qrbox: { width: 250, height: 150 } },
@@ -200,7 +199,7 @@ function stopScanner() {
 
 function onScanSuccess(decodedText) {
     if (navigator.vibrate) navigator.vibrate(100); 
-    playBeep(); // FITUR BARU: BUNYI BIP KASIR
+    playBeep(); 
 
     let product = DB.getProducts().find(p => p.barcode === decodedText);
     if (product) {
@@ -528,8 +527,23 @@ function prosesKePreview() {
     renderCart();
     closePaymentModal();
 
-    if (settings.autoPrint) { executePrint(); } 
-    else { document.getElementById('preview-modal').style.display = 'flex'; }
+    if (settings.autoPrint) { 
+        cetakViaRawBT(receiptText); 
+    } else { 
+        document.getElementById('preview-modal').style.display = 'flex'; 
+    }
+}
+
+// FUNGSI KHUSUS RAWBT PRINTER (MENGGANTIKAN WEB BLUETOOTH)
+function cetakViaRawBT(textData) {
+    try {
+        let encodedText = encodeURIComponent(textData);
+        // Membuka URI Intent khusus yang ditangkap oleh RawBT
+        let intentUrl = "intent:" + encodedText + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
+        window.location.href = intentUrl;
+    } catch (e) {
+        alert("Gagal memanggil RawBT. Pastikan aplikasi RawBT sudah terinstal.");
+    }
 }
 
 async function executePrint() {
@@ -537,13 +551,14 @@ async function executePrint() {
     let settings = DB.getSettings();
     document.getElementById('preview-modal').style.display = 'none';
 
-    if (settings.autoPrint && bluetoothDevice) {
-        if (typeof connectAndPrintBluetooth === "function") await connectAndPrintBluetooth(finalReceiptText, settings.logoBase64);
+    if (settings.autoPrint) {
+        cetakViaRawBT(finalReceiptText);
     } else {
-        let mauBluetooth = confirm("Cetak struk menggunakan BLUETOOTH?");
-        if (mauBluetooth) {
-            if (typeof connectAndPrintBluetooth === "function") await connectAndPrintBluetooth(finalReceiptText, settings.logoBase64);
+        let mauCetak = confirm("Cetak struk menggunakan aplikasi RawBT?\nPastikan Anda sudah menginstal aplikasinya.");
+        if (mauCetak) {
+            cetakViaRawBT(finalReceiptText);
         } else {
+            // Fallback cetak layar biasa
             let fallbackLogo = document.getElementById('print-area-logo');
             if(settings.logoBase64) {
                 fallbackLogo.src = settings.logoBase64;
@@ -556,19 +571,18 @@ async function executePrint() {
     }
 }
 
-// ================= RIWAYAT, LAPORAN & CETAK ULANG (REPRINT) =================
+// ================= RIWAYAT, LAPORAN & CETAK ULANG =================
 function renderHistory() {
     let historyList = document.getElementById('history-list');
     historyList.innerHTML = '';
     
     let histories = DB.getHistory();
-    let todayStr = new Date().toLocaleDateString('id-ID'); // Format: DD/MM/YYYY
+    let todayStr = new Date().toLocaleDateString('id-ID'); 
     
     let totalPendapatanHariIni = 0;
     let totalTrxHariIni = 0;
 
     histories.forEach(h => {
-        // Kalkulasi Pendapatan khusus HARI INI
         if (h.waktu.includes(todayStr)) {
             totalPendapatanHariIni += h.total;
             totalTrxHariIni++;
@@ -589,12 +603,10 @@ function renderHistory() {
             </li>`;
     });
 
-    // Update Banner Laporan Pendapatan Hari Ini
     document.getElementById('report-today-revenue').innerText = formatRupiah(totalPendapatanHariIni);
     document.getElementById('report-today-trx').innerText = totalTrxHariIni + " trx";
 }
 
-// Fitur Baru: Cetak Ulang Struk
 function cetakUlangStruk(trxId) {
     let h = DB.getHistory().find(x => x.id === trxId);
     if(!h) return alert("Transaksi tidak ditemukan!");
@@ -622,7 +634,6 @@ function cetakUlangStruk(trxId) {
     receiptText += "--------------------------------\n";
     receiptText += "     " + footerText + "     \n";
 
-    // Lempar ke layar preview agar bisa diedit/dilihat sebelum benar-benar di-print
     document.getElementById('print-text-preview').value = receiptText;
     document.getElementById('preview-modal').style.display = 'flex';
 }
