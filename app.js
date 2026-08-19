@@ -2,6 +2,8 @@ let cart = [];
 let isAdmin = false;
 let editingBarcode = null;
 let currentPage = 'page-home';
+let currentPaymentMethod = 'cash';
+let paymentProcessing = false;
 
 let html5QrcodeScanner = null;
 let scannerStarting = false;
@@ -17,9 +19,13 @@ let productBarcodeSession = 0;
 let productCameraStream = null;
 window.capturedProductPhoto = '';
 let activeAppDialog = null;
+const APP_PAGE_STATE_KEY = 'warungScanPage';
+const COLOR_THEMES = ['teal', 'emerald', 'blue', 'navy', 'purple', 'pink', 'red', 'orange', 'brown', 'slate'];
+const DISPLAY_MODES = ['light', 'dark', 'auto'];
 
 const PRODUCT_PLACEHOLDER =
     'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2260%22%20height%3D%2260%22%3E%3Crect%20width%3D%2260%22%20height%3D%2260%22%20fill%3D%22%23f3f4f6%22%2F%3E%3Ctext%20x%3D%2230%22%20y%3D%2234%22%20font-size%3D%2210%22%20text-anchor%3D%22middle%22%20fill%3D%22%239ca3af%22%3EProduk%3C%2Ftext%3E%3C%2Fsvg%3E';
+const DEFAULT_QRIS_IMAGE = 'data:image/png;base64,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';
 
 // ================= UTILITAS =================
 function formatRupiah(value) {
@@ -43,6 +49,13 @@ function safeImageSource(value) {
     return /^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(value || '')
         ? value
         : PRODUCT_PLACEHOLDER;
+}
+
+function getQrisImageSource(settings = DB.getSettings()) {
+    const savedImage = String(settings?.qrisImageBase64 || '');
+    return /^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(savedImage)
+        ? savedImage
+        : DEFAULT_QRIS_IMAGE;
 }
 
 function showAppToast(message, type = 'info', duration = 3200) {
@@ -274,6 +287,44 @@ async function getBase64(file, isLogo = false) {
     });
 }
 
+async function getQrisBase64(file) {
+    if (!file) throw new Error('Gambar QRIS tidak ditemukan.');
+    if (file.type && !file.type.startsWith('image/')) throw new Error('QRIS harus berupa gambar.');
+
+    const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = event => resolve(event.target.result);
+        reader.onerror = () => reject(new Error('Gambar QRIS gagal dibaca.'));
+        reader.readAsDataURL(file);
+    });
+
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                const maxWidth = 900;
+                const maxHeight = 1200;
+                const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+                canvas.width = Math.max(1, Math.round(image.width * scale));
+                canvas.height = Math.max(1, Math.round(image.height * scale));
+                const context = canvas.getContext('2d');
+                context.fillStyle = '#ffffff';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                const ratio = canvas.width / canvas.height;
+                resolve(ratio >= 0.82 && ratio <= 1.18
+                    ? canvas.toDataURL('image/png')
+                    : canvas.toDataURL('image/jpeg', 0.9));
+            } catch (error) {
+                reject(error);
+            }
+        };
+        image.onerror = () => reject(new Error('Format QRIS tidak didukung. Gunakan JPG, PNG, atau WEBP.'));
+        image.src = dataUrl;
+    });
+}
+
 // ================= FOTO PRODUK & KAMERA =================
 function setProductPhoto(base64) {
     window.capturedProductPhoto = base64 || '';
@@ -385,10 +436,14 @@ function captureProductCamera() {
 }
 
 // ================= NAVIGASI =================
-function switchTab(tabId) {
+function switchTab(tabId, options = {}) {
     const target = document.getElementById(tabId);
     if (!target) return;
 
+    const previousPage = currentPage;
+    if (options.updateHistory !== false && previousPage !== tabId) {
+        window.history.pushState({ [APP_PAGE_STATE_KEY]: tabId }, '', window.location.href);
+    }
     currentPage = tabId;
     document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
     target.classList.add('active');
@@ -407,9 +462,59 @@ function switchTab(tabId) {
     window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
+function closeVisibleOverlayForBack() {
+    if (activeAppDialog) {
+        finishAppDialog(false);
+        return true;
+    }
+
+    const productBarcodeModal = document.getElementById('product-barcode-modal');
+    if (productBarcodeModal?.style.display === 'flex') {
+        closeProductBarcodeScanner();
+        return true;
+    }
+
+    const productCameraModal = document.getElementById('product-camera-modal');
+    if (productCameraModal?.style.display === 'flex') {
+        closeProductCamera();
+        return true;
+    }
+
+    for (const modalId of ['payment-modal', 'preview-modal']) {
+        const modal = document.getElementById(modalId);
+        if (modal?.style.display === 'flex') {
+            modal.style.display = 'none';
+            return true;
+        }
+    }
+    return false;
+}
+
+function goBackInApp() {
+    if (closeVisibleOverlayForBack()) return true;
+    if (currentPage === 'page-home') return false;
+
+    if (window.history.state?.[APP_PAGE_STATE_KEY] === currentPage && window.history.length > 1) {
+        window.history.back();
+    } else {
+        switchTab('page-home', { updateHistory: false });
+    }
+    return true;
+}
+window.goBackInApp = goBackInApp;
+
 function goToHome() {
     switchTab('page-home');
 }
+
+window.addEventListener('popstate', event => {
+    if (closeVisibleOverlayForBack()) {
+        window.history.pushState({ [APP_PAGE_STATE_KEY]: currentPage }, '', window.location.href);
+        return;
+    }
+    const targetPage = event.state?.[APP_PAGE_STATE_KEY] || 'page-home';
+    switchTab(targetPage, { updateHistory: false });
+});
 
 async function actionCariBarang() {
     switchTab('page-barang');
@@ -492,8 +597,67 @@ function openLowStockProducts() {
 }
 
 // ================= PENGATURAN =================
+function getEffectiveDisplayMode(settings = DB.getSettings()) {
+    const selectedMode = DISPLAY_MODES.includes(settings.displayMode) ? settings.displayMode : 'light';
+    if (selectedMode !== 'auto') return selectedMode;
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function applyAppTheme(settings = DB.getSettings()) {
+    const colorTheme = COLOR_THEMES.includes(settings.colorTheme) ? settings.colorTheme : 'teal';
+    const displayMode = DISPLAY_MODES.includes(settings.displayMode) ? settings.displayMode : 'light';
+    const root = document.documentElement;
+    root.dataset.colorTheme = colorTheme;
+    root.dataset.displayMode = displayMode;
+    root.dataset.effectiveMode = getEffectiveDisplayMode(settings);
+
+    const themeColor = getComputedStyle(root).getPropertyValue('--brand-primary').trim();
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme && themeColor) metaTheme.setAttribute('content', themeColor);
+}
+
+function updateThemeUI() {
+    const settings = DB.getSettings();
+    const colorTheme = COLOR_THEMES.includes(settings.colorTheme) ? settings.colorTheme : 'teal';
+    const displayMode = DISPLAY_MODES.includes(settings.displayMode) ? settings.displayMode : 'light';
+
+    document.querySelectorAll('[data-color-theme]').forEach(button => {
+        const active = button.dataset.colorTheme === colorTheme;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', String(active));
+    });
+    document.querySelectorAll('[data-display-mode]').forEach(button => {
+        const active = button.dataset.displayMode === displayMode;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', String(active));
+    });
+}
+
+function selectColorTheme(colorTheme) {
+    if (!COLOR_THEMES.includes(colorTheme)) return;
+    const settings = DB.getSettings();
+    settings.colorTheme = colorTheme;
+    if (DB.saveSettings(settings)) {
+        applyAppTheme(settings);
+        updateThemeUI();
+        showAppToast('Warna aplikasi berhasil diubah.', 'success');
+    }
+}
+
+function selectDisplayMode(displayMode) {
+    if (!DISPLAY_MODES.includes(displayMode)) return;
+    const settings = DB.getSettings();
+    settings.displayMode = displayMode;
+    if (DB.saveSettings(settings)) {
+        applyAppTheme(settings);
+        updateThemeUI();
+        showAppToast('Mode tampilan berhasil diubah.', 'success');
+    }
+}
+
 function loadSettingsUI() {
     const settings = DB.getSettings();
+    applyAppTheme(settings);
     document.getElementById('setting-autoprint').value = String(settings.autoPrint);
     document.getElementById('setting-printmode').value = settings.printMode || 'rawbt';
     document.getElementById('template-header').value = settings.headerText || 'WARUNGSCAN';
@@ -501,6 +665,7 @@ function loadSettingsUI() {
     document.getElementById('template-phone').value = settings.storePhone || '';
     document.getElementById('template-footer').value = settings.footerText || 'Terima Kasih';
     document.getElementById('setting-admin-pin').value = settings.adminPin || '';
+    document.getElementById('setting-qris-merchant').value = settings.qrisMerchantName || 'AL - STORE';
 
     const previewContainer = document.getElementById('preview-logo-container');
     const previewImage = document.getElementById('preview-logo');
@@ -511,8 +676,12 @@ function loadSettingsUI() {
         previewImage.removeAttribute('src');
         previewContainer.style.display = 'none';
     }
+    const qrisImage = getQrisImageSource(settings);
+    document.getElementById('setting-qris-preview').src = qrisImage;
+    document.getElementById('setting-qris-preview-name').textContent = settings.qrisMerchantName || 'AL - STORE';
     updatePrintModeUI();
     updateReceiptTemplateUI();
+    updateThemeUI();
 }
 
 async function handleLogoUpload() {
@@ -544,6 +713,36 @@ function hapusLogo() {
     }
 }
 
+async function handleQrisUpload() {
+    const fileInput = document.getElementById('setting-qris-file');
+    const file = fileInput.files?.[0];
+    if (!file) return;
+
+    try {
+        const qrisImageBase64 = await getQrisBase64(file);
+        const settings = DB.getSettings();
+        settings.qrisImageBase64 = qrisImageBase64;
+        if (DB.saveSettings(settings)) {
+            loadSettingsUI();
+            showAppToast('Gambar QRIS berhasil diperbarui.', 'success');
+        }
+    } catch (error) {
+        showAppToast(`QRIS gagal diproses: ${error.message}`, 'error', 4500);
+    } finally {
+        fileInput.value = '';
+    }
+}
+
+function restoreDefaultQris() {
+    const settings = DB.getSettings();
+    settings.qrisImageBase64 = '';
+    settings.qrisMerchantName = 'AL - STORE';
+    if (DB.saveSettings(settings)) {
+        loadSettingsUI();
+        showAppToast('QRIS AL - STORE dipakai kembali.', 'success');
+    }
+}
+
 function saveSettings() {
     const settings = DB.getSettings();
     settings.autoPrint = document.getElementById('setting-autoprint').value === 'true';
@@ -553,7 +752,9 @@ function saveSettings() {
     settings.storePhone = document.getElementById('template-phone').value.trim();
     settings.footerText = document.getElementById('template-footer').value.trim() || 'Terima Kasih';
     settings.adminPin = document.getElementById('setting-admin-pin').value.replace(/\D/g, '').slice(0, 6);
+    settings.qrisMerchantName = document.getElementById('setting-qris-merchant').value.trim() || 'AL - STORE';
     DB.saveSettings(settings);
+    document.getElementById('setting-qris-preview-name').textContent = settings.qrisMerchantName;
     updateReceiptTemplateUI();
 }
 
@@ -589,7 +790,8 @@ function updateReceiptTemplateUI() {
         ],
         total: 11000,
         tunai: 15000,
-        kembali: 4000
+        kembali: 4000,
+        paymentMethod: 'cash'
     });
 }
 
@@ -1242,15 +1444,23 @@ function openPaymentModal() {
         return;
     }
     const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
+    const settings = DB.getSettings();
     document.getElementById('modal-total-belanja').textContent = formatRupiah(total);
+    document.getElementById('qris-payment-total').textContent = formatRupiah(total);
+    document.getElementById('qris-payment-merchant').textContent = settings.qrisMerchantName || 'AL - STORE';
+    document.getElementById('qris-payment-image').src = getQrisImageSource(settings);
     document.getElementById('input-tunai').value = '';
     document.getElementById('modal-kembalian').textContent = formatRupiah(0);
+    selectPaymentMethod(settings.lastPaymentMethod === 'qris' ? 'qris' : 'cash', false);
     document.getElementById('payment-modal').style.display = 'flex';
-    setTimeout(() => document.getElementById('input-tunai').focus(), 100);
+    if (currentPaymentMethod === 'cash') setTimeout(() => document.getElementById('input-tunai').focus(), 100);
 }
 
 function closePaymentModal() {
     document.getElementById('payment-modal').style.display = 'none';
+    paymentProcessing = false;
+    const button = document.getElementById('payment-confirm-button');
+    if (button) button.disabled = false;
 }
 
 function closePreviewModal() {
@@ -1261,6 +1471,27 @@ function hitungKembalian() {
     const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
     const cash = Number(document.getElementById('input-tunai').value) || 0;
     document.getElementById('modal-kembalian').textContent = formatRupiah(Math.max(0, cash - total));
+}
+
+function selectPaymentMethod(method, persist = true) {
+    currentPaymentMethod = method === 'qris' ? 'qris' : 'cash';
+    const isQris = currentPaymentMethod === 'qris';
+    document.getElementById('cash-payment-panel').style.display = isQris ? 'none' : 'block';
+    document.getElementById('qris-payment-panel').style.display = isQris ? 'block' : 'none';
+    document.getElementById('payment-method-cash').classList.toggle('is-active', !isQris);
+    document.getElementById('payment-method-qris').classList.toggle('is-active', isQris);
+    document.getElementById('payment-method-cash').setAttribute('aria-pressed', String(!isQris));
+    document.getElementById('payment-method-qris').setAttribute('aria-pressed', String(isQris));
+    document.getElementById('payment-confirm-button').textContent = isQris
+        ? 'Dana Sudah Masuk & Cetak'
+        : 'Proses Tunai';
+
+    if (persist) {
+        const settings = DB.getSettings();
+        settings.lastPaymentMethod = currentPaymentMethod;
+        DB.saveSettings(settings);
+    }
+    if (!isQris) setTimeout(() => document.getElementById('input-tunai')?.focus(), 80);
 }
 
 function receiptMoney(value) {
@@ -1316,6 +1547,21 @@ function receiptStoreHeader(settings, width = 32, compact = false) {
     return lines;
 }
 
+function receiptPaymentLines(transaction, width = 32) {
+    const isQris = String(transaction.paymentMethod || 'cash').toLowerCase() === 'qris';
+    if (isQris) {
+        return [
+            receiptColumns('METODE BAYAR', 'QRIS', width),
+            receiptColumns('DIBAYAR', `Rp ${receiptMoney(transaction.total)}`, width)
+        ];
+    }
+    return [
+        receiptColumns('METODE BAYAR', 'TUNAI', width),
+        receiptColumns('TUNAI', `Rp ${receiptMoney(transaction.tunai)}`, width),
+        receiptColumns('KEMBALI', `Rp ${receiptMoney(transaction.kembali)}`, width)
+    ];
+}
+
 function buildReceipt(transaction, isCopy = false) {
     const settings = DB.getSettings();
     const template = settings.receiptTemplate || 'classic';
@@ -1338,8 +1584,7 @@ function buildReceipt(transaction, isCopy = false) {
         });
         lines.push(thinLine);
         lines.push(receiptColumns('TOTAL', `Rp ${receiptMoney(transaction.total)}`, width));
-        lines.push(receiptColumns('TUNAI', `Rp ${receiptMoney(transaction.tunai)}`, width));
-        lines.push(receiptColumns('KEMBALI', `Rp ${receiptMoney(transaction.kembali)}`, width));
+        lines.push(...receiptPaymentLines(transaction, width));
         lines.push(...centerReceiptText(settings.footerText || 'Terima Kasih', width));
     } else if (template === 'modern') {
         lines.push(...receiptStoreHeader(settings, width));
@@ -1354,8 +1599,7 @@ function buildReceipt(transaction, isCopy = false) {
         });
         lines.push(thickLine);
         lines.push(receiptColumns('TOTAL BELANJA', `Rp ${receiptMoney(transaction.total)}`, width));
-        lines.push(receiptColumns('UANG DITERIMA', `Rp ${receiptMoney(transaction.tunai)}`, width));
-        lines.push(receiptColumns('KEMBALIAN', `Rp ${receiptMoney(transaction.kembali)}`, width));
+        lines.push(...receiptPaymentLines(transaction, width));
         lines.push(thickLine);
         lines.push(...centerReceiptText(settings.footerText || 'Terima Kasih', width));
     } else if (template === 'detailed') {
@@ -1372,8 +1616,7 @@ function buildReceipt(transaction, isCopy = false) {
         });
         lines.push(thinLine);
         lines.push(receiptColumns('TOTAL', `Rp ${receiptMoney(transaction.total)}`, width));
-        lines.push(receiptColumns('TUNAI', `Rp ${receiptMoney(transaction.tunai)}`, width));
-        lines.push(receiptColumns('KEMBALI', `Rp ${receiptMoney(transaction.kembali)}`, width));
+        lines.push(...receiptPaymentLines(transaction, width));
         lines.push(thickLine);
         lines.push(...centerReceiptText(settings.footerText || 'Terima Kasih', width));
     } else {
@@ -1389,8 +1632,7 @@ function buildReceipt(transaction, isCopy = false) {
         });
         lines.push(thinLine);
         lines.push(receiptColumns('TOTAL', `Rp ${receiptMoney(transaction.total)}`, width));
-        lines.push(receiptColumns('TUNAI', `Rp ${receiptMoney(transaction.tunai)}`, width));
-        lines.push(receiptColumns('KEMBALI', `Rp ${receiptMoney(transaction.kembali)}`, width));
+        lines.push(...receiptPaymentLines(transaction, width));
         lines.push(thinLine);
         lines.push(...centerReceiptText(settings.footerText || 'Terima Kasih', width));
     }
@@ -1398,36 +1640,48 @@ function buildReceipt(transaction, isCopy = false) {
     return `${lines.join('\n')}\n`;
 }
 
-async function prosesKePreview() {
+function createTransaction(paymentMethod) {
     const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
-    const cash = Number(document.getElementById('input-tunai').value) || 0;
-    if (cash < total) {
+    const isQris = paymentMethod === 'qris';
+    const cash = isQris ? total : Number(document.getElementById('input-tunai').value) || 0;
+    if (!isQris && cash < total) {
         showAppToast('Uang tunai pembeli masih kurang.', 'warning');
-        return;
-    }
-
-    const products = DB.getProducts();
-    for (const cartItem of cart) {
-        const product = products.find(item => item.barcode === cartItem.barcode);
-        if (!product || product.stok < cartItem.qty) {
-            showAppToast(`Stok ${cartItem.name} berubah atau tidak mencukupi. Perbarui keranjang.`, 'warning');
-            return;
-        }
-        product.stok -= cartItem.qty;
+        return null;
     }
 
     const now = Date.now();
-    const transaction = {
+    const settings = DB.getSettings();
+    return {
         id: now,
         createdAt: now,
+        paidAt: now,
         waktu: new Date(now).toLocaleString('id-ID'),
         items: cart.map(item => ({ ...item })),
         total,
         tunai: cash,
-        kembali: cash - total
+        kembali: isQris ? 0 : cash - total,
+        paymentMethod: isQris ? 'qris' : 'cash',
+        paymentStatus: 'paid',
+        paymentMerchant: isQris ? (settings.qrisMerchantName || 'AL - STORE') : ''
     };
+}
 
-    if (!DB.commitSale(products, transaction)) return;
+function applyTransactionStock(transaction) {
+    const products = DB.getProducts();
+    for (const soldItem of transaction.items) {
+        const product = products.find(item => item.barcode === soldItem.barcode);
+        if (!product || product.stok < soldItem.qty) {
+            showAppToast(`Stok ${soldItem.name} berubah atau tidak mencukupi. Perbarui keranjang.`, 'warning');
+            return null;
+        }
+        product.stok -= soldItem.qty;
+    }
+    return products;
+}
+
+async function finalizePaidTransaction(transaction, forcePrint = false) {
+    const products = applyTransactionStock(transaction);
+    if (!products || !DB.commitSale(products, transaction)) return false;
 
     const receiptText = buildReceipt(transaction);
     document.getElementById('print-text-preview').value = receiptText;
@@ -1437,12 +1691,43 @@ async function prosesKePreview() {
     updateDashboardStats();
 
     const settings = DB.getSettings();
-    if (settings.autoPrint) {
+    if (forcePrint || settings.autoPrint) {
         const printed = await printReceipt(receiptText);
         if (!printed) document.getElementById('preview-modal').style.display = 'flex';
+        else showAppToast('Pembayaran tersimpan dan struk berhasil dikirim ke printer.', 'success', 4200);
     } else {
         document.getElementById('preview-modal').style.display = 'flex';
     }
+    return true;
+}
+
+async function processSelectedPayment() {
+    if (paymentProcessing) return;
+    paymentProcessing = true;
+    const button = document.getElementById('payment-confirm-button');
+    button.disabled = true;
+
+    try {
+        if (currentPaymentMethod === 'qris') {
+            const confirmed = await showAppConfirm(
+                'Pastikan dana QRIS sudah benar-benar masuk. Setelah dikonfirmasi, stok akan berkurang dan struk langsung dicetak.',
+                { title: 'Konfirmasi Dana QRIS', confirmText: 'Dana Sudah Masuk', icon: '✓' }
+            );
+            if (!confirmed) return;
+        }
+
+        const transaction = createTransaction(currentPaymentMethod);
+        if (!transaction) return;
+        await finalizePaidTransaction(transaction, currentPaymentMethod === 'qris');
+    } finally {
+        paymentProcessing = false;
+        button.disabled = false;
+    }
+}
+
+async function prosesKePreview() {
+    selectPaymentMethod('cash', false);
+    await processSelectedPayment();
 }
 
 function cetakViaRawBT(textData) {
@@ -1480,6 +1765,56 @@ async function printReceipt(textData) {
         return printViaBrowser(textData, settings.logoBase64);
     }
     return cetakViaRawBT(textData);
+}
+
+function buildQrisPrintText(total = 0) {
+    const settings = DB.getSettings();
+    const width = 32;
+    const lines = [
+        ...centerReceiptText('QRIS', width),
+        ...centerReceiptText(settings.qrisMerchantName || 'AL - STORE', width)
+    ];
+    if (Number(total) > 0) {
+        lines.push('-'.repeat(width));
+        lines.push(...centerReceiptText(`TOTAL ${formatRupiah(total)}`, width));
+    }
+    lines.push('-'.repeat(width));
+    lines.push(...centerReceiptText('Scan dengan aplikasi berlogo QRIS', width));
+    lines.push(...centerReceiptText('Pastikan nama merchant sesuai', width));
+    return `${lines.join('\n')}\n\n`;
+}
+
+async function printQrisImage(total = 0) {
+    const settings = DB.getSettings();
+    const qrisImage = getQrisImageSource(settings);
+    const qrisText = buildQrisPrintText(total);
+    let printed = false;
+
+    if (isNativePrinterAvailable() || settings.printMode === 'bluetooth') {
+        printed = await connectAndPrintBluetooth(qrisText, qrisImage, true);
+    } else if (settings.printMode === 'browser') {
+        printed = printViaBrowser(qrisText, qrisImage);
+    } else {
+        showAppToast('Gambar QRIS tidak dapat dicetak lewat RawBT. Pilih Bluetooth Langsung RPP02N atau Dialog Browser.', 'warning', 4800);
+        return false;
+    }
+
+    if (printed) showAppToast('QRIS berhasil dikirim ke printer.', 'success');
+    return printed;
+}
+
+async function printStoredQris() {
+    saveSettings();
+    await printQrisImage(0);
+}
+
+async function printCurrentQris() {
+    const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
+    if (!total) {
+        showAppToast('Keranjang kosong. Tidak ada total QRIS untuk dicetak.', 'warning');
+        return;
+    }
+    await printQrisImage(total);
 }
 
 async function executePrint() {
@@ -1543,11 +1878,13 @@ function renderHistory() {
         const itemNames = transaction.items
             .map(item => `${escapeHtml(item.name)} (${item.qty})`)
             .join(', ');
+        const paymentLabel = transaction.paymentMethod === 'qris' ? 'QRIS' : 'TUNAI';
         return `
             <li>
                 <div class="item-info">
                     <h4>No. Ref: ${escapeHtml(transaction.id)}</h4>
                     <p class="text-success">${escapeHtml(transaction.waktu)}</p>
+                    <span class="category-badge">${paymentLabel}</span>
                     <p>${itemNames}</p>
                     <button data-reprint-index="${index}" class="btn-outline btn-small history-print">🖨️ Cetak Ulang</button>
                 </div>
@@ -1600,10 +1937,11 @@ function exportHistoryCsv() {
     }
 
     const rows = [
-        ['ID', 'Tanggal', 'Barang', 'Total', 'Tunai', 'Kembali', 'Estimasi Laba'],
+        ['ID', 'Tanggal', 'Metode Pembayaran', 'Barang', 'Total', 'Tunai', 'Kembali', 'Estimasi Laba'],
         ...histories.map(transaction => [
             transaction.id,
             transaction.waktu,
+            transaction.paymentMethod === 'qris' ? 'QRIS' : 'Tunai',
             transaction.items.map(item => `${item.name} x${item.qty}`).join('; '),
             transaction.total,
             transaction.tunai,
@@ -1860,7 +2198,17 @@ window.addEventListener('pagehide', () => {
     closeProductBarcodeScanner();
 });
 
+if (!window.history.state?.[APP_PAGE_STATE_KEY]) {
+    window.history.replaceState({ [APP_PAGE_STATE_KEY]: 'page-home' }, '', window.location.href);
+}
+
+const systemThemeQuery = window.matchMedia?.('(prefers-color-scheme: dark)');
+systemThemeQuery?.addEventListener?.('change', () => {
+    if (DB.getSettings().displayMode === 'auto') applyAppTheme();
+});
+
 initializeNativeDefaults();
+applyAppTheme();
 renderProducts();
 renderCart();
 updateDashboardStats();

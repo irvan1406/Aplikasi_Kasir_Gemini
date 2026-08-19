@@ -203,7 +203,7 @@ async function disconnectBluetoothPrinter() {
     updatePrinterStatus('Printer belum terhubung', false);
 }
 
-async function generateLogoRaster(base64Logo) {
+async function generateLogoRaster(base64Logo, crispImage = false) {
     if (!base64Logo) return new Uint8Array();
 
     return new Promise((resolve, reject) => {
@@ -219,6 +219,8 @@ async function generateLogoRaster(base64Logo) {
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, targetWidth, targetHeight);
+                // Hindari tepi QR menjadi abu-abu saat diperbesar/diperkecil.
+                ctx.imageSmoothingEnabled = !crispImage;
                 ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
                 const pixels = ctx.getImageData(0, 0, targetWidth, targetHeight).data;
@@ -258,7 +260,7 @@ async function generateLogoRaster(base64Logo) {
     });
 }
 
-async function connectAndPrintBluetooth(customReceiptText, logoBase64) {
+async function connectAndPrintBluetooth(customReceiptText, logoBase64, crispImage = false) {
     if (isNativePrinterAvailable()) {
         try {
             if (!isNativePrinterConnected()) {
@@ -269,7 +271,7 @@ async function connectAndPrintBluetooth(customReceiptText, logoBase64) {
             const parts = [];
             if (logoBase64) {
                 parts.push(new Uint8Array([0x1B, 0x40, 0x1B, 0x61, 0x01]));
-                const logoBytes = await generateLogoRaster(logoBase64);
+                const logoBytes = await generateLogoRaster(logoBase64, crispImage);
                 if (logoBytes.length) parts.push(logoBytes);
             }
             parts.push(new Uint8Array([0x1B, 0x40, 0x1B, 0x61, 0x00]));
@@ -297,7 +299,7 @@ async function connectAndPrintBluetooth(customReceiptText, logoBase64) {
         // ESC @ (init), ESC a 1 (center) untuk logo.
         if (logoBase64) {
             await sendToPrinterInChunks(new Uint8Array([0x1B, 0x40, 0x1B, 0x61, 0x01]));
-            const logoBytes = await generateLogoRaster(logoBase64);
+            const logoBytes = await generateLogoRaster(logoBase64, crispImage);
             if (logoBytes.length) await sendToPrinterInChunks(logoBytes);
         }
 

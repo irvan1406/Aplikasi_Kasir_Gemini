@@ -10,6 +10,11 @@ const DB = (() => {
         autoPrint: false,
         printMode: 'rawbt',
         logoBase64: '',
+        colorTheme: 'teal',
+        displayMode: 'light',
+        qrisMerchantName: 'AL - STORE',
+        qrisImageBase64: '',
+        lastPaymentMethod: 'cash',
         receiptTemplate: 'classic',
         headerText: 'WARUNGSCAN',
         storeAddress: '',
@@ -83,6 +88,9 @@ const DB = (() => {
 
     function normalizeTransaction(transaction) {
         const legacyTimestamp = Number(transaction?.id) || Date.parse(transaction?.waktu || '') || Date.now();
+        const paymentMethod = String(transaction?.paymentMethod || 'cash').toLowerCase() === 'qris'
+            ? 'qris'
+            : 'cash';
         return {
             ...transaction,
             id: Number(transaction?.id) || Date.now(),
@@ -91,7 +99,10 @@ const DB = (() => {
             items: Array.isArray(transaction?.items) ? transaction.items.map(normalizeProductItem) : [],
             total: Number(transaction?.total) || 0,
             tunai: Number(transaction?.tunai) || 0,
-            kembali: Number(transaction?.kembali) || 0
+            kembali: Number(transaction?.kembali) || 0,
+            paymentMethod,
+            paymentStatus: String(transaction?.paymentStatus || 'paid'),
+            paidAt: Number(transaction?.paidAt) || Number(transaction?.createdAt) || legacyTimestamp
         };
     }
 
@@ -185,7 +196,7 @@ const DB = (() => {
 
     function exportData() {
         return JSON.stringify({
-            version: 3,
+            version: 4,
             exportedAt: new Date().toISOString(),
             products: getProducts(),
             history: getHistory(),
