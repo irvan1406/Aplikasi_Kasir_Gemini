@@ -58,6 +58,7 @@ const DB = (() => {
             hargaBeli: Number(product?.hargaBeli) || 0,
             stok: Math.max(0, Number.parseInt(product?.stok, 10) || 0),
             satuan: String(product?.satuan || '').trim(),
+            category: String(product?.category || product?.kategori || 'Lainnya').trim() || 'Lainnya',
             photo: typeof product?.photo === 'string' ? product.photo : ''
         };
     }

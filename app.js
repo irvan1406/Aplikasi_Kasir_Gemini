@@ -258,6 +258,10 @@ function goToHome() {
 function actionCariBarang() {
     switchTab('page-barang');
     setAdminMode(false);
+    document.getElementById('search-input').value = '';
+    document.getElementById('filter-category').value = '';
+    document.getElementById('filter-stock').value = '';
+    renderProducts();
     setTimeout(() => document.getElementById('search-input').focus(), 100);
 }
 
@@ -283,6 +287,52 @@ function updateDashboardStats() {
     document.getElementById('stat-barang').textContent = products.length;
     document.getElementById('stat-menipis').textContent = lowStock;
     document.getElementById('stat-habis').textContent = outOfStock;
+
+    const todayKey = getLocalDateKey();
+    const todayHistory = DB.getHistory().filter(transaction =>
+        getLocalDateKey(transaction.createdAt || transaction.id) === todayKey
+    );
+    const todayRevenue = todayHistory.reduce((sum, transaction) => sum + Number(transaction.total || 0), 0);
+    const todayItems = todayHistory.reduce((sum, transaction) =>
+        sum + transaction.items.reduce((itemSum, item) => itemSum + Number(item.qty || 0), 0), 0
+    );
+
+    document.getElementById('home-today-revenue').textContent = formatRupiah(todayRevenue);
+    document.getElementById('home-today-transactions').textContent = todayHistory.length;
+    document.getElementById('home-today-items').textContent = todayItems;
+    document.getElementById('home-today-average').textContent = formatRupiah(
+        todayHistory.length ? todayRevenue / todayHistory.length : 0
+    );
+
+    const criticalProducts = products
+        .filter(product => product.stok <= 5)
+        .sort((first, second) => first.stok - second.stok || first.name.localeCompare(second.name, 'id'))
+        .slice(0, 5);
+    const criticalList = document.getElementById('home-low-stock-list');
+
+    if (!criticalProducts.length) {
+        criticalList.innerHTML = '<div class="dashboard-empty">Stok barang masih aman.</div>';
+    } else {
+        criticalList.innerHTML = criticalProducts.map(product => `
+            <div class="low-stock-row">
+                <span class="stock-signal ${product.stok === 0 ? 'is-out' : 'is-low'}"></span>
+                <div class="low-stock-info">
+                    <strong>${escapeHtml(product.name)}</strong>
+                    <small>${escapeHtml(product.category)} · ${escapeHtml(product.satuan || 'Pcs')}</small>
+                </div>
+                <span class="low-stock-count ${product.stok === 0 ? 'stock-out' : 'stock-low'}">${product.stok}</span>
+            </div>
+        `).join('');
+    }
+}
+
+function openLowStockProducts() {
+    switchTab('page-barang');
+    setAdminMode(false);
+    document.getElementById('filter-stock').value = 'critical';
+    document.getElementById('filter-category').value = '';
+    document.getElementById('search-input').value = '';
+    renderProducts();
 }
 
 // ================= PENGATURAN =================
@@ -552,7 +602,8 @@ function cariBarangKasir() {
 
     const filtered = DB.getProducts().filter(product =>
         product.barcode.toLowerCase().includes(keyword) ||
-        product.name.toLowerCase().includes(keyword)
+        product.name.toLowerCase().includes(keyword) ||
+        product.category.toLowerCase().includes(keyword)
     );
 
     if (!filtered.length) {
@@ -562,7 +613,7 @@ function cariBarangKasir() {
             <li data-product-index="${index}">
                 <div class="item-info">
                     <h4>${escapeHtml(product.name)}</h4>
-                    <p>BC: ${escapeHtml(product.barcode)} · Stok ${product.stok}</p>
+                    <p>${escapeHtml(product.category)} · BC: ${escapeHtml(product.barcode)} · Stok ${product.stok}</p>
                 </div>
                 <strong class="text-success">${formatRupiah(product.price)}</strong>
             </li>
@@ -596,7 +647,8 @@ function addManualBarcode() {
 
     const filtered = products.filter(product =>
         product.barcode.toLowerCase().includes(keyword) ||
-        product.name.toLowerCase().includes(keyword)
+        product.name.toLowerCase().includes(keyword) ||
+        product.category.toLowerCase().includes(keyword)
     );
     if (filtered.length === 1) pilihBarangKasir(filtered[0].barcode);
     else if (filtered.length > 1) alert('Ada lebih dari satu barang yang cocok. Pilih dari daftar.');
@@ -606,8 +658,10 @@ function addManualBarcode() {
 // ================= MANAJEMEN BARANG =================
 function resetProductForm() {
     editingBarcode = null;
-    ['input-barcode', 'input-nama', 'input-harga', 'input-harga-beli', 'input-stok', 'input-satuan']
+    ['input-barcode', 'input-nama', 'input-harga', 'input-harga-beli', 'input-stok']
         .forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('input-satuan').value = 'Pcs';
+    document.getElementById('input-kategori').value = 'Lainnya';
     setProductPhoto('');
     document.getElementById('title-barang').textContent = isAdmin ? 'Tambah Barang' : 'Manajemen Barang';
 }
@@ -656,6 +710,7 @@ function editBarang(barcode) {
     document.getElementById('input-harga-beli').value = product.hargaBeli || '';
     document.getElementById('input-stok').value = product.stok;
     document.getElementById('input-satuan').value = product.satuan || '';
+    document.getElementById('input-kategori').value = product.category || 'Lainnya';
     setProductPhoto(product.photo || '');
     document.getElementById('title-barang').textContent = 'Edit Barang';
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -665,12 +720,14 @@ function simpanBarang() {
     const barcode = document.getElementById('input-barcode').value.trim();
     const name = document.getElementById('input-nama').value.trim();
     const price = Number(document.getElementById('input-harga').value);
-    const purchasePrice = Number(document.getElementById('input-harga-beli').value);
+    const purchasePriceInput = document.getElementById('input-harga-beli').value.trim();
+    const purchasePrice = purchasePriceInput === '' ? 0 : Number(purchasePriceInput);
     const stock = Number.parseInt(document.getElementById('input-stok').value, 10);
     const unit = document.getElementById('input-satuan').value.trim();
+    const category = document.getElementById('input-kategori').value.trim();
 
-    if (!barcode || !name || !unit || !Number.isFinite(price) || !Number.isFinite(purchasePrice) || !Number.isInteger(stock)) {
-        alert('Lengkapi Barcode, Nama, Harga Beli, Harga Jual, Stok, dan Satuan.');
+    if (!barcode || !name || !category || !unit || !Number.isFinite(price) || !Number.isFinite(purchasePrice) || !Number.isInteger(stock)) {
+        alert('Lengkapi Barcode, Nama, Kategori, Harga Jual, Stok, dan Satuan.');
         return;
     }
     if (price < 0 || purchasePrice < 0 || stock < 0) {
@@ -693,6 +750,7 @@ function simpanBarang() {
         hargaBeli: purchasePrice,
         stok: stock,
         satuan: unit,
+        category,
         photo: window.capturedProductPhoto || ''
     }, editingBarcode);
 
@@ -710,10 +768,21 @@ function simpanBarang() {
 function renderProducts() {
     const productList = document.getElementById('product-list');
     const searchKeyword = document.getElementById('search-input').value.trim().toLowerCase();
+    const categoryFilter = document.getElementById('filter-category').value;
+    const stockFilter = document.getElementById('filter-stock').value;
     const filtered = DB.getProducts().filter(product =>
-        product.name.toLowerCase().includes(searchKeyword) ||
-        product.barcode.toLowerCase().includes(searchKeyword)
+        (product.name.toLowerCase().includes(searchKeyword) ||
+        product.barcode.toLowerCase().includes(searchKeyword) ||
+        product.category.toLowerCase().includes(searchKeyword)) &&
+        (!categoryFilter || product.category === categoryFilter) &&
+        (!stockFilter ||
+            (stockFilter === 'available' && product.stok > 0) ||
+            (stockFilter === 'critical' && product.stok <= 5) ||
+            (stockFilter === 'low' && product.stok >= 1 && product.stok <= 5) ||
+            (stockFilter === 'out' && product.stok === 0))
     );
+
+    document.getElementById('catalog-count').textContent = filtered.length;
 
     if (!filtered.length) {
         productList.innerHTML = '<li class="empty-state">Belum ada barang yang cocok.</li>';
@@ -727,11 +796,13 @@ function renderProducts() {
                 <img src="${safeImageSource(product.photo)}" class="product-img" alt="">
                 <div class="item-info">
                     <h4>${escapeHtml(product.name)}</h4>
+                    <span class="category-badge">${escapeHtml(product.category)}</span>
                     <p class="${stockClass}">Stok: <strong>${product.stok}</strong> ${escapeHtml(product.satuan)} · ${formatRupiah(product.price)}</p>
                     <p class="barcode-caption">BC: ${escapeHtml(product.barcode)}</p>
                 </div>
                 ${isAdmin ? `
                     <div class="item-actions">
+                        <button data-restock-index="${index}" class="btn-warning btn-small">+ Stok</button>
                         <button data-edit-index="${index}" class="btn-primary btn-small">Edit</button>
                         <button data-delete-index="${index}" class="btn-danger btn-small">Hapus</button>
                     </div>
@@ -743,9 +814,31 @@ function renderProducts() {
     productList.querySelectorAll('[data-edit-index]').forEach(button => {
         button.addEventListener('click', () => editBarang(filtered[Number(button.dataset.editIndex)].barcode));
     });
+    productList.querySelectorAll('[data-restock-index]').forEach(button => {
+        button.addEventListener('click', () => restockProduct(filtered[Number(button.dataset.restockIndex)].barcode));
+    });
     productList.querySelectorAll('[data-delete-index]').forEach(button => {
         button.addEventListener('click', () => hapusBarang(filtered[Number(button.dataset.deleteIndex)].barcode));
     });
+}
+
+function restockProduct(barcode) {
+    const product = DB.getProducts().find(item => item.barcode === barcode);
+    if (!product) return;
+
+    const rawAmount = prompt(`Tambahkan stok untuk ${product.name}:`, '1');
+    if (rawAmount === null) return;
+    const amount = Number.parseInt(rawAmount, 10);
+    if (!Number.isInteger(amount) || amount <= 0) {
+        alert('Jumlah restok harus berupa angka lebih dari 0.');
+        return;
+    }
+
+    const saved = DB.saveProduct({ ...product, stok: product.stok + amount }, product.barcode);
+    if (!saved) return;
+    renderProducts();
+    updateDashboardStats();
+    alert(`Stok ${product.name} bertambah ${amount} ${product.satuan || 'Pcs'}.`);
 }
 
 function hapusBarang(barcode) {
