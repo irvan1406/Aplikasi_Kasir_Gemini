@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KASIR VAN - PREMIUM</title>
+    <title>Warung Scan</title>
     <!-- Import Font Modern dari Google -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -347,8 +347,8 @@
 
             <label class="input-label">Metode Cetak</label>
             <select id="setting-printmode" class="modern-input" onchange="saveSettings(); updatePrintModeUI();">
-                <option value="rawbt">RawBT (Disarankan untuk APK)</option>
-                <option value="bluetooth">Bluetooth LE Langsung</option>
+                <option value="rawbt">RawBT (Aplikasi Tambahan)</option>
+                <option value="bluetooth">Bluetooth Langsung — RPP02N</option>
                 <option value="browser">Dialog Cetak Browser</option>
             </select>
 
@@ -378,7 +378,7 @@
             <input type="text" id="template-footer" class="modern-input" placeholder="Terima Kasih" oninput="saveSettings()">
 
             <label class="input-label">Logo Toko (Monokrom)</label>
-            <p class="helper-text" style="margin-bottom: 8px;">Logo dicetak langsung pada mode Bluetooth LE atau Browser. Mode RawBT mengirim teks struk.</p>
+            <p class="helper-text" style="margin-bottom: 8px;">Logo dicetak langsung pada mode Bluetooth RPP02N atau Browser. Mode RawBT mengirim teks struk.</p>
             <div class="photo-upload-group">
                 <div class="btn-outline native-file-picker">
                     Pilih Logo

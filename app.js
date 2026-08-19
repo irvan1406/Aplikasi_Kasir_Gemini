@@ -69,6 +69,30 @@ function vibrate(duration = 100) {
 }
 
 function downloadBlob(blob, filename) {
+    try {
+        if (window.WarungScanNative?.isNativeApp?.()) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const dataUrl = String(reader.result || '');
+                const base64Data = dataUrl.includes(',') ? dataUrl.split(',')[1] : '';
+                if (!base64Data) {
+                    alert('File gagal disiapkan untuk disimpan.');
+                    return;
+                }
+                window.WarungScanNative.saveFileBase64(
+                    filename,
+                    blob.type || 'application/octet-stream',
+                    base64Data
+                );
+            };
+            reader.onerror = () => alert('File gagal dibaca sebelum disimpan.');
+            reader.readAsDataURL(blob);
+            return;
+        }
+    } catch (error) {
+        console.debug('Penyimpanan native tidak tersedia; memakai unduhan browser.', error);
+    }
+
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -400,7 +424,9 @@ function updatePrintModeUI() {
     bluetoothActions.style.display = mode === 'bluetooth' ? 'grid' : 'none';
     if (mode === 'rawbt') updatePrinterStatus('Mode RawBT siap digunakan', true);
     else if (mode === 'browser') updatePrinterStatus('Dialog cetak browser siap digunakan', true);
-    else if (bluetoothDevice?.gatt?.connected) {
+    else if (isNativePrinterConnected()) {
+        updatePrinterStatus('Terhubung: RPP02N', true);
+    } else if (bluetoothDevice?.gatt?.connected) {
         updatePrinterStatus(`Terhubung: ${bluetoothDevice.name || 'Printer'}`, true);
     } else {
         updatePrinterStatus('Printer Bluetooth belum terhubung', false);
@@ -1234,6 +1260,21 @@ async function importBackup(inputElement) {
 }
 
 // ================= INIT & CLEANUP =================
+function initializeNativeDefaults() {
+    try {
+        if (!window.WarungScanNative?.isNativeApp?.()) return;
+        const markerKey = 'warungscan_native_defaults_v1';
+        if (localStorage.getItem(markerKey)) return;
+
+        const settings = DB.getSettings();
+        settings.printMode = 'bluetooth';
+        DB.saveSettings(settings);
+        localStorage.setItem(markerKey, 'true');
+    } catch (error) {
+        console.debug('Pengaturan awal Android tidak dapat diterapkan.', error);
+    }
+}
+
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
         stopScanner();
@@ -1245,6 +1286,7 @@ window.addEventListener('pagehide', () => {
     closeProductCamera();
 });
 
+initializeNativeDefaults();
 renderProducts();
 renderCart();
 updateDashboardStats();
