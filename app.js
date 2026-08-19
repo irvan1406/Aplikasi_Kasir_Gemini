@@ -4,10 +4,6 @@ let editingBarcode = null;
 let currentPage = 'page-home';
 let currentPaymentMethod = 'cash';
 let paymentProcessing = false;
-let activeMidtransPayment = null;
-let midtransPollTimer = null;
-let midtransPollBusy = false;
-let midtransCompletionInProgress = false;
 
 let html5QrcodeScanner = null;
 let scannerStarting = false;
@@ -24,8 +20,6 @@ let productCameraStream = null;
 window.capturedProductPhoto = '';
 let activeAppDialog = null;
 const APP_PAGE_STATE_KEY = 'warungScanPage';
-const MIDTRANS_APP_TOKEN_KEY = 'warungscan_midtrans_app_token';
-const MIDTRANS_POLL_INTERVAL_MS = 10000;
 const COLOR_THEMES = ['teal', 'emerald', 'blue', 'navy', 'purple', 'pink', 'red', 'orange', 'brown', 'slate'];
 const DISPLAY_MODES = ['light', 'dark', 'auto'];
 
@@ -62,41 +56,6 @@ function getQrisImageSource(settings = DB.getSettings()) {
     return /^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(savedImage)
         ? savedImage
         : DEFAULT_QRIS_IMAGE;
-}
-
-function getMidtransAppToken() {
-    try {
-        return localStorage.getItem(MIDTRANS_APP_TOKEN_KEY) || '';
-    } catch (error) {
-        return '';
-    }
-}
-
-function normalizeMidtransBackendUrl(value) {
-    const rawValue = String(value || '').trim().replace(/\/+$/, '');
-    if (!rawValue) throw new Error('URL backend Midtrans belum diisi.');
-    let parsed;
-    try {
-        parsed = new URL(rawValue);
-    } catch (error) {
-        throw new Error('Format URL backend tidak valid.');
-    }
-    const isLocal = ['localhost', '127.0.0.1'].includes(parsed.hostname);
-    if (parsed.protocol !== 'https:' && !(isLocal && parsed.protocol === 'http:')) {
-        throw new Error('Backend Midtrans wajib memakai HTTPS.');
-    }
-    parsed.pathname = parsed.pathname.replace(/\/+$/, '').replace(/\/api\/midtrans$/i, '');
-    parsed.search = '';
-    parsed.hash = '';
-    return parsed.toString().replace(/\/$/, '');
-}
-
-function getMidtransWebhookUrl(settings = DB.getSettings()) {
-    try {
-        return `${normalizeMidtransBackendUrl(settings.midtransBackendUrl)}/api/midtrans?action=webhook`;
-    } catch (error) {
-        return '';
-    }
 }
 
 function showAppToast(message, type = 'info', duration = 3200) {
@@ -707,9 +666,6 @@ function loadSettingsUI() {
     document.getElementById('template-footer').value = settings.footerText || 'Terima Kasih';
     document.getElementById('setting-admin-pin').value = settings.adminPin || '';
     document.getElementById('setting-qris-merchant').value = settings.qrisMerchantName || 'AL - STORE';
-    document.getElementById('setting-qris-mode').value = settings.qrisMode === 'midtrans' ? 'midtrans' : 'manual';
-    document.getElementById('setting-midtrans-backend-url').value = settings.midtransBackendUrl || '';
-    document.getElementById('setting-midtrans-app-token').value = getMidtransAppToken();
 
     const previewContainer = document.getElementById('preview-logo-container');
     const previewImage = document.getElementById('preview-logo');
@@ -723,7 +679,6 @@ function loadSettingsUI() {
     const qrisImage = getQrisImageSource(settings);
     document.getElementById('setting-qris-preview').src = qrisImage;
     document.getElementById('setting-qris-preview-name').textContent = settings.qrisMerchantName || 'AL - STORE';
-    updateQrisIntegrationUI();
     updatePrintModeUI();
     updateReceiptTemplateUI();
     updateThemeUI();
@@ -788,144 +743,6 @@ function restoreDefaultQris() {
     }
 }
 
-function saveMidtransAppToken() {
-    const input = document.getElementById('setting-midtrans-app-token');
-    try {
-        localStorage.setItem(MIDTRANS_APP_TOKEN_KEY, String(input?.value || '').trim());
-    } catch (error) {
-        showAppToast('Token aplikasi gagal disimpan di perangkat.', 'error');
-    }
-}
-
-async function prepareMidtransAppToken() {
-    const input = document.getElementById('setting-midtrans-app-token');
-    let token = String(input?.value || '').trim();
-    if (!token) {
-        if (!window.crypto?.getRandomValues) {
-            showAppToast('Perangkat ini tidak mendukung pembuatan token aman.', 'error');
-            return;
-        }
-        const randomBytes = new Uint8Array(24);
-        window.crypto.getRandomValues(randomBytes);
-        token = Array.from(randomBytes, value => value.toString(16).padStart(2, '0')).join('');
-        input.value = token;
-        saveMidtransAppToken();
-    }
-
-    try {
-        await navigator.clipboard.writeText(token);
-        showAppToast('Token disalin. Tempel sebagai WARUNGSCAN_APP_TOKEN di Vercel.', 'success', 4800);
-    } catch (error) {
-        await showAppPrompt('Salin token ini ke WARUNGSCAN_APP_TOKEN di Vercel:', token, {
-            title: 'Token Aplikasi', confirmText: 'Tutup', icon: '🔑'
-        });
-    }
-}
-
-function setMidtransConnectionStatus(message, type = 'idle') {
-    const status = document.getElementById('midtrans-connection-status');
-    const dot = document.getElementById('midtrans-connection-dot');
-    if (status) {
-        status.className = `integration-status is-${type}`;
-        status.textContent = message;
-    }
-    if (dot) {
-        dot.classList.toggle('is-online', type === 'success');
-        dot.classList.toggle('is-error', type === 'error');
-    }
-}
-
-function updateQrisIntegrationUI() {
-    const settings = DB.getSettings();
-    const modeInput = document.getElementById('setting-qris-mode');
-    const mode = modeInput?.value === 'midtrans' ? 'midtrans' : (settings.qrisMode === 'midtrans' ? 'midtrans' : 'manual');
-    const panel = document.getElementById('midtrans-settings-panel');
-    const badge = document.getElementById('qris-integration-badge');
-    const backendInput = document.getElementById('setting-midtrans-backend-url');
-    const webhookOutput = document.getElementById('setting-midtrans-webhook-url');
-    if (panel) panel.style.display = mode === 'midtrans' ? 'block' : 'none';
-    if (badge) {
-        badge.textContent = mode === 'midtrans' ? 'Midtrans' : 'Manual';
-        badge.classList.toggle('is-auto', mode === 'midtrans');
-    }
-
-    const backendValue = backendInput?.value || settings.midtransBackendUrl || '';
-    let webhookUrl = '';
-    try {
-        webhookUrl = `${normalizeMidtransBackendUrl(backendValue)}/api/midtrans?action=webhook`;
-    } catch (error) {
-        // Kolom boleh belum lengkap saat pengguna sedang mengetik.
-    }
-    if (webhookOutput) webhookOutput.textContent = webhookUrl || 'Isi URL backend terlebih dahulu';
-}
-
-async function copyMidtransWebhookUrl() {
-    const webhookUrl = getMidtransWebhookUrl({ midtransBackendUrl: document.getElementById('setting-midtrans-backend-url')?.value });
-    if (!webhookUrl) {
-        showAppToast('Isi URL backend yang valid terlebih dahulu.', 'warning');
-        return;
-    }
-    try {
-        await navigator.clipboard.writeText(webhookUrl);
-        showAppToast('Alamat webhook berhasil disalin.', 'success');
-    } catch (error) {
-        await showAppPrompt('Salin alamat webhook berikut:', webhookUrl, {
-            title: 'Alamat Webhook Midtrans', confirmText: 'Tutup', icon: '↗'
-        });
-    }
-}
-
-async function midtransApiRequest(action, { method = 'GET', body = null, query = {}, timeout = 20000 } = {}) {
-    const settings = DB.getSettings();
-    const backendUrl = normalizeMidtransBackendUrl(settings.midtransBackendUrl);
-    const requestUrl = new URL(`${backendUrl}/api/midtrans`);
-    requestUrl.searchParams.set('action', action);
-    Object.entries(query).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') requestUrl.searchParams.set(key, String(value));
-    });
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-    const headers = { Accept: 'application/json' };
-    const appToken = getMidtransAppToken();
-    if (appToken) headers['X-Warung-Token'] = appToken;
-    if (body !== null) headers['Content-Type'] = 'application/json';
-
-    try {
-        const response = await fetch(requestUrl, {
-            method,
-            headers,
-            body: body === null ? undefined : JSON.stringify(body),
-            signal: controller.signal,
-            cache: 'no-store'
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || payload.ok === false) {
-            throw new Error(payload.message || `Backend Midtrans merespons ${response.status}.`);
-        }
-        return payload;
-    } catch (error) {
-        if (error.name === 'AbortError') throw new Error('Backend Midtrans tidak merespons. Coba lagi.');
-        throw error;
-    } finally {
-        clearTimeout(timeoutId);
-    }
-}
-
-async function testMidtransConnection() {
-    saveSettings();
-    saveMidtransAppToken();
-    setMidtransConnectionStatus('Menguji backend dan konfigurasi Midtrans…', 'loading');
-    try {
-        const result = await midtransApiRequest('health');
-        const environment = result.environment === 'production' ? 'Production' : 'Sandbox';
-        setMidtransConnectionStatus(`Terhubung · ${environment} · Webhook siap menerima notifikasi.`, 'success');
-        showAppToast(`Midtrans ${environment} berhasil terhubung.`, 'success');
-    } catch (error) {
-        setMidtransConnectionStatus(error.message, 'error');
-        showAppToast(`Koneksi Midtrans gagal: ${error.message}`, 'error', 4800);
-    }
-}
-
 function saveSettings() {
     const settings = DB.getSettings();
     settings.autoPrint = document.getElementById('setting-autoprint').value === 'true';
@@ -936,12 +753,9 @@ function saveSettings() {
     settings.footerText = document.getElementById('template-footer').value.trim() || 'Terima Kasih';
     settings.adminPin = document.getElementById('setting-admin-pin').value.replace(/\D/g, '').slice(0, 6);
     settings.qrisMerchantName = document.getElementById('setting-qris-merchant').value.trim() || 'AL - STORE';
-    settings.qrisMode = document.getElementById('setting-qris-mode').value === 'midtrans' ? 'midtrans' : 'manual';
-    settings.midtransBackendUrl = document.getElementById('setting-midtrans-backend-url').value.trim().replace(/\/+$/, '');
     DB.saveSettings(settings);
     document.getElementById('setting-qris-preview-name').textContent = settings.qrisMerchantName;
     updateReceiptTemplateUI();
-    updateQrisIntegrationUI();
 }
 
 function selectReceiptTemplate(templateName) {
@@ -1517,10 +1331,6 @@ async function restockProduct(barcode) {
 }
 
 async function hapusBarang(barcode) {
-    if (activeMidtransPayment) {
-        showAppToast('Barang tidak dapat dihapus saat QRIS Midtrans masih menunggu pembayaran.', 'warning', 4500);
-        return;
-    }
     const confirmed = await showAppConfirm('Barang akan dihapus permanen dari katalog. Lanjutkan?', {
         title: 'Hapus Barang', confirmText: 'Hapus', icon: '🗑'
     });
@@ -1535,14 +1345,7 @@ async function hapusBarang(barcode) {
 }
 
 // ================= KERANJANG =================
-function guardPendingMidtransCart() {
-    if (!activeMidtransPayment) return false;
-    showAppToast('Keranjang dikunci sampai QRIS Midtrans dibayar atau dibatalkan.', 'warning', 4200);
-    return true;
-}
-
 function addToCart(product) {
-    if (guardPendingMidtransCart()) return;
     const existing = cart.find(item => item.barcode === product.barcode);
     if (existing) {
         if (existing.qty >= product.stok) {
@@ -1562,7 +1365,6 @@ function addToCart(product) {
 }
 
 function ubahQty(barcode, delta) {
-    if (guardPendingMidtransCart()) return;
     const item = cart.find(entry => entry.barcode === barcode);
     const product = DB.getProducts().find(entry => entry.barcode === barcode);
     if (!item || !product) return;
@@ -1580,10 +1382,6 @@ function ubahQty(barcode, delta) {
 }
 
 function ketikQtyManual(barcode, inputElement) {
-    if (guardPendingMidtransCart()) {
-        renderCart();
-        return;
-    }
     const item = cart.find(entry => entry.barcode === barcode);
     const product = DB.getProducts().find(entry => entry.barcode === barcode);
     if (!item || !product) return;
@@ -1640,22 +1438,8 @@ function renderCart() {
 }
 
 // ================= PEMBAYARAN & CETAK =================
-function isMidtransQrisMode(settings = DB.getSettings()) {
-    return settings.qrisMode === 'midtrans';
-}
-
-function setQrisPaymentStatus(title, detail, type = 'idle') {
-    const status = document.getElementById('qris-auto-status');
-    if (status) status.className = `qris-auto-status is-${type}`;
-    const titleElement = document.getElementById('qris-status-title');
-    const detailElement = document.getElementById('qris-status-detail');
-    if (titleElement) titleElement.textContent = title;
-    if (detailElement) detailElement.textContent = detail;
-}
-
 function updateQrisPaymentUI() {
     const settings = DB.getSettings();
-    const automaticMode = isMidtransQrisMode(settings) || Boolean(activeMidtransPayment);
     const image = document.getElementById('qris-payment-image');
     const placeholder = document.getElementById('qris-image-placeholder');
     const modeBadge = document.getElementById('qris-payment-mode-badge');
@@ -1663,58 +1447,22 @@ function updateQrisPaymentUI() {
     const confirmNote = document.getElementById('qris-confirm-note');
     const confirmButton = document.getElementById('payment-confirm-button');
     const printButton = document.getElementById('qris-print-button');
-    const checkButton = document.getElementById('qris-check-button');
-    const cancelButton = document.getElementById('qris-cancel-button');
+    image.src = getQrisImageSource(settings);
+    image.style.display = 'block';
+    placeholder.style.display = 'none';
+    modeBadge.textContent = 'QRIS STATIS';
+    instruction.textContent = 'Pembeli memindai QR lalu memasukkan total pembayaran yang tertera.';
+    confirmNote.textContent = 'Pastikan dana sudah terlihat masuk di aplikasi bank/merchant sebelum menekan tombol konfirmasi.';
+    confirmNote.style.display = 'block';
+    confirmButton.textContent = 'Dana Sudah Masuk & Cetak';
+    printButton.disabled = false;
 
-    if (!automaticMode) {
-        image.src = getQrisImageSource(settings);
-        image.style.display = 'block';
-        placeholder.style.display = 'none';
-        modeBadge.textContent = 'QRIS STATIS';
-        instruction.textContent = 'Pembeli memindai QR lalu memasukkan total di atas.';
-        confirmNote.textContent = 'Pastikan dana sudah terlihat masuk di aplikasi bank/merchant sebelum menekan tombol konfirmasi.';
-        confirmNote.style.display = 'block';
-        confirmButton.textContent = 'Dana Sudah Masuk & Cetak';
-        printButton.disabled = false;
-        checkButton.style.display = 'none';
-        cancelButton.style.display = 'none';
-        setQrisPaymentStatus('QRIS statis siap', 'Konfirmasi dana secara manual setelah pembayaran masuk.', 'idle');
-        return;
-    }
-
-    modeBadge.textContent = 'MIDTRANS OTOMATIS';
-    instruction.textContent = activeMidtransPayment
-        ? 'Nominal sudah tertanam di QR. Jangan minta pembeli memasukkan total lagi.'
-        : 'Kode QR dinamis akan dibuat sesuai total belanja.';
-    confirmNote.style.display = 'none';
-
-    if (activeMidtransPayment?.qrImage) {
-        image.src = activeMidtransPayment.qrImage;
-        image.style.display = 'block';
-        placeholder.style.display = 'none';
-        confirmButton.textContent = 'Cek Status Sekarang';
-        printButton.disabled = false;
-        checkButton.style.display = 'flex';
-        cancelButton.style.display = 'flex';
-        setQrisPaymentStatus(
-            'Menunggu pembayaran Midtrans…',
-            `Order ${activeMidtransPayment.orderId} · status diperiksa otomatis setiap 10 detik.`,
-            'pending'
-        );
-    } else {
-        image.removeAttribute('src');
-        image.style.display = 'none';
-        placeholder.style.display = 'flex';
-        confirmButton.textContent = 'Buat QRIS Midtrans';
-        printButton.disabled = true;
-        checkButton.style.display = 'none';
-        cancelButton.style.display = 'none';
-        if (settings.midtransBackendUrl) {
-            setQrisPaymentStatus('Midtrans siap membuat QRIS', 'Tekan tombol untuk membuat QR sesuai total belanja.', 'idle');
-        } else {
-            setQrisPaymentStatus('Backend Midtrans belum diatur', 'Isi URL backend pada menu Pengaturan terlebih dahulu.', 'error');
-        }
-    }
+    const status = document.getElementById('qris-manual-status');
+    if (status) status.className = 'qris-manual-status';
+    const titleElement = document.getElementById('qris-status-title');
+    const detailElement = document.getElementById('qris-status-detail');
+    if (titleElement) titleElement.textContent = 'QRIS statis siap';
+    if (detailElement) detailElement.textContent = 'Status pembayaran dikonfirmasi manual setelah dana masuk.';
 }
 
 function openPaymentModal() {
@@ -1729,7 +1477,7 @@ function openPaymentModal() {
     document.getElementById('qris-payment-merchant').textContent = settings.qrisMerchantName || 'AL - STORE';
     document.getElementById('input-tunai').value = '';
     document.getElementById('modal-kembalian').textContent = formatRupiah(0);
-    const initialMethod = (activeMidtransPayment || settings.lastPaymentMethod === 'qris') ? 'qris' : 'cash';
+    const initialMethod = settings.lastPaymentMethod === 'qris' ? 'qris' : 'cash';
     selectPaymentMethod(initialMethod, false);
     document.getElementById('payment-modal').style.display = 'flex';
     if (currentPaymentMethod === 'cash') setTimeout(() => document.getElementById('input-tunai').focus(), 100);
@@ -1753,10 +1501,6 @@ function hitungKembalian() {
 }
 
 function selectPaymentMethod(method, persist = true) {
-    if (method !== 'qris' && activeMidtransPayment) {
-        if (persist) showAppToast('Selesaikan atau batalkan QRIS Midtrans yang masih menunggu pembayaran.', 'warning', 4500);
-        method = 'qris';
-    }
     currentPaymentMethod = method === 'qris' ? 'qris' : 'cash';
     const isQris = currentPaymentMethod === 'qris';
     document.getElementById('cash-payment-panel').style.display = isQris ? 'none' : 'block';
@@ -1832,14 +1576,10 @@ function receiptStoreHeader(settings, width = 32, compact = false) {
 function receiptPaymentLines(transaction, width = 32) {
     const isQris = String(transaction.paymentMethod || 'cash').toLowerCase() === 'qris';
     if (isQris) {
-        const lines = [
+        return [
             receiptColumns('METODE BAYAR', 'QRIS', width),
             receiptColumns('DIBAYAR', `Rp ${receiptMoney(transaction.total)}`, width)
         ];
-        if (transaction.midtransOrderId) {
-            lines.push(...wrapReceiptText(`REF ${transaction.midtransOrderId}`, width));
-        }
-        return lines;
     }
     return [
         receiptColumns('METODE BAYAR', 'TUNAI', width),
@@ -1926,11 +1666,6 @@ function buildReceipt(transaction, isCopy = false) {
     return `${lines.join('\n')}\n`;
 }
 
-function createMidtransOrderId() {
-    const randomPart = Math.random().toString(36).slice(2, 8).toUpperCase();
-    return `WS-${Date.now()}-${randomPart}`;
-}
-
 function compactPaymentItems(items) {
     return items.map(item => ({
         barcode: String(item.barcode || ''),
@@ -1944,229 +1679,6 @@ function compactPaymentItems(items) {
         subtotal: Number(item.subtotal) || (Number(item.price) || 0) * (Number(item.qty) || 1),
         photo: ''
     }));
-}
-
-function clearMidtransPollTimer() {
-    if (midtransPollTimer) clearTimeout(midtransPollTimer);
-    midtransPollTimer = null;
-}
-
-function scheduleMidtransPaymentPoll(delay = MIDTRANS_POLL_INTERVAL_MS) {
-    clearMidtransPollTimer();
-    if (!activeMidtransPayment || midtransCompletionInProgress) return;
-    midtransPollTimer = setTimeout(() => pollMidtransPaymentStatus({ automatic: true }), delay);
-}
-
-function clearActiveMidtransPayment() {
-    clearMidtransPollTimer();
-    activeMidtransPayment = null;
-    DB.clearPendingMidtransPayment();
-}
-
-function restorePendingMidtransPayment() {
-    const pending = DB.getPendingMidtransPayment();
-    if (!pending) return false;
-
-    const itemTotal = pending.items.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
-    const validOrderId = /^WS-[A-Za-z0-9_-]{8,47}$/.test(pending.orderId);
-    const validQrImage = /^data:image\/png;base64,[A-Za-z0-9+/=\s]+$/i.test(pending.qrImage || '');
-    const alreadySaved = DB.getHistory().some(transaction => transaction.midtransOrderId === pending.orderId);
-    if (!validOrderId || !validQrImage || itemTotal !== Number(pending.amount) || alreadySaved) {
-        DB.clearPendingMidtransPayment();
-        return false;
-    }
-
-    activeMidtransPayment = pending;
-    cart = compactPaymentItems(pending.items);
-    currentPaymentMethod = 'qris';
-    return true;
-}
-
-async function startMidtransQrisPayment() {
-    if (activeMidtransPayment) {
-        await pollMidtransPaymentStatus({ manual: true });
-        return;
-    }
-
-    const total = cart.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
-    if (!total) {
-        showAppToast('Total transaksi harus lebih dari Rp 0.', 'warning');
-        return;
-    }
-    const items = compactPaymentItems(cart);
-    const orderId = createMidtransOrderId();
-    setQrisPaymentStatus('Membuat QRIS Midtrans…', 'Menghubungi backend dengan aman.', 'loading');
-    try {
-        normalizeMidtransBackendUrl(DB.getSettings().midtransBackendUrl);
-        const result = await midtransApiRequest('create-qris', {
-            method: 'POST',
-            body: {
-                order_id: orderId,
-                gross_amount: total,
-                merchant_name: DB.getSettings().qrisMerchantName || 'AL - STORE',
-                items: items.map(item => ({
-                    id: item.barcode || 'ITEM',
-                    name: item.name,
-                    price: item.price,
-                    quantity: item.qty
-                }))
-            },
-            timeout: 30000
-        });
-        const qrImage = String(result.qr_image || '');
-        if (!/^data:image\/png;base64,/i.test(qrImage)) {
-            throw new Error('Backend tidak mengirim gambar QRIS yang dapat dicetak.');
-        }
-        if (String(result.order_id || '') !== orderId || Number(result.gross_amount) !== total) {
-            throw new Error('Data transaksi dari backend tidak cocok dengan total belanja.');
-        }
-
-        activeMidtransPayment = {
-            orderId,
-            transactionId: String(result.transaction_id || ''),
-            amount: total,
-            qrImage,
-            qrUrl: String(result.qr_url || ''),
-            expiryTime: String(result.expiry_time || ''),
-            status: String(result.transaction_status || 'pending'),
-            createdAt: Date.now(),
-            items
-        };
-        if (!DB.savePendingMidtransPayment(activeMidtransPayment)) {
-            let cancelled = false;
-            try {
-                await midtransApiRequest('expire', { method: 'POST', body: { order_id: orderId } });
-                cancelled = true;
-            } catch (expireError) {
-                updateQrisPaymentUI();
-                scheduleMidtransPaymentPoll();
-            }
-            if (cancelled) {
-                activeMidtransPayment = null;
-                throw new Error('Penyimpanan HP penuh. QR dibatalkan agar transaksi tidak hilang.');
-            }
-            throw new Error('Penyimpanan HP penuh dan QR belum dapat dibatalkan. Jangan tutup aplikasi; cek status atau batalkan lagi.');
-        }
-        updateQrisPaymentUI();
-        scheduleMidtransPaymentPoll();
-        showAppToast('QRIS Midtrans dibuat. Menunggu pembayaran otomatis.', 'success', 4200);
-    } catch (error) {
-        setQrisPaymentStatus('QRIS Midtrans gagal dibuat', error.message, 'error');
-        showAppToast(`Midtrans: ${error.message}`, 'error', 5000);
-    }
-}
-
-async function completeMidtransPayment(statusResult) {
-    if (!activeMidtransPayment || midtransCompletionInProgress) return;
-    midtransCompletionInProgress = true;
-    clearMidtransPollTimer();
-    const payment = activeMidtransPayment;
-
-    try {
-        const duplicate = DB.getHistory().find(transaction => transaction.midtransOrderId === payment.orderId);
-        if (duplicate) {
-            clearActiveMidtransPayment();
-            cart = [];
-            renderCart();
-            closePaymentModal();
-            showAppToast('Pembayaran Midtrans ini sudah pernah disimpan.', 'info');
-            return;
-        }
-
-        cart = compactPaymentItems(payment.items);
-        const transaction = createTransaction('qris', {
-            total: payment.amount,
-            items: payment.items,
-            paymentStatus: statusResult.transaction_status || 'settlement',
-            midtransOrderId: payment.orderId,
-            midtransTransactionId: statusResult.transaction_id || payment.transactionId,
-            paymentIssuer: statusResult.issuer || '',
-            paymentReference: statusResult.reference_id || ''
-        });
-        const finalized = await finalizePaidTransaction(transaction, true, true);
-        if (!finalized) throw new Error('Transaksi dibayar tetapi gagal disimpan. Jangan tutup aplikasi dan coba cek status lagi.');
-        clearActiveMidtransPayment();
-        setQrisPaymentStatus('Pembayaran berhasil', 'Dana terverifikasi Midtrans dan struk sudah diproses.', 'success');
-        vibrate(250);
-        playBeep();
-    } catch (error) {
-        setQrisPaymentStatus('Dana masuk, penyimpanan perlu diulang', error.message, 'error');
-        showAppToast(error.message, 'error', 6000);
-    } finally {
-        midtransCompletionInProgress = false;
-        if (activeMidtransPayment) scheduleMidtransPaymentPoll();
-    }
-}
-
-async function pollMidtransPaymentStatus({ manual = false, automatic = false } = {}) {
-    if (!activeMidtransPayment || midtransPollBusy || midtransCompletionInProgress) return;
-    midtransPollBusy = true;
-    const payment = activeMidtransPayment;
-    if (manual) setQrisPaymentStatus('Memeriksa status Midtrans…', `Order ${payment.orderId}`, 'loading');
-
-    try {
-        const result = await midtransApiRequest('status', { query: { order_id: payment.orderId } });
-        if (String(result.order_id || '') !== payment.orderId || Number(result.gross_amount) !== Number(payment.amount)) {
-            throw new Error('Status Midtrans tidak cocok dengan transaksi yang sedang dibuka.');
-        }
-
-        activeMidtransPayment.status = String(result.transaction_status || 'pending');
-        activeMidtransPayment.transactionId = String(result.transaction_id || payment.transactionId || '');
-        DB.savePendingMidtransPayment(activeMidtransPayment);
-
-        if (result.is_paid === true) {
-            setQrisPaymentStatus('Pembayaran terverifikasi', 'Menyimpan transaksi dan mencetak struk…', 'success');
-            await completeMidtransPayment(result);
-            return;
-        }
-
-        const terminalStatuses = ['expire', 'deny', 'cancel', 'failure'];
-        if (terminalStatuses.includes(result.transaction_status)) {
-            const finalStatus = String(result.transaction_status || 'gagal').toUpperCase();
-            clearActiveMidtransPayment();
-            updateQrisPaymentUI();
-            setQrisPaymentStatus(`Pembayaran ${finalStatus}`, 'Buat QRIS Midtrans baru untuk mencoba kembali.', 'error');
-            showAppToast(`Transaksi Midtrans berstatus ${finalStatus}.`, 'warning', 4500);
-            return;
-        }
-
-        updateQrisPaymentUI();
-        if (manual) showAppToast('Pembayaran masih menunggu.', 'info');
-    } catch (error) {
-        setQrisPaymentStatus('Belum dapat memeriksa status', `${error.message} Pemeriksaan otomatis akan diulang.`, 'error');
-        if (manual && !automatic) showAppToast(`Cek Midtrans gagal: ${error.message}`, 'error', 4500);
-    } finally {
-        midtransPollBusy = false;
-        if (activeMidtransPayment && !midtransCompletionInProgress) scheduleMidtransPaymentPoll();
-    }
-}
-
-async function checkMidtransPaymentNow() {
-    if (!activeMidtransPayment) {
-        showAppToast('Belum ada QRIS Midtrans yang aktif.', 'warning');
-        return;
-    }
-    await pollMidtransPaymentStatus({ manual: true });
-}
-
-async function cancelPendingMidtransPayment() {
-    if (!activeMidtransPayment) return;
-    const confirmed = await showAppConfirm(
-        'QRIS ini akan dibuat kedaluwarsa di Midtrans dan tidak dapat dibayar lagi. Lanjutkan?',
-        { title: 'Batalkan QRIS Midtrans', confirmText: 'Batalkan QRIS', icon: '×' }
-    );
-    if (!confirmed) return;
-    const orderId = activeMidtransPayment.orderId;
-    try {
-        await midtransApiRequest('expire', { method: 'POST', body: { order_id: orderId } });
-        clearActiveMidtransPayment();
-        updateQrisPaymentUI();
-        setQrisPaymentStatus('QRIS dibatalkan', 'Keranjang tetap tersimpan dan QR baru dapat dibuat.', 'idle');
-        showAppToast('QRIS Midtrans berhasil dibatalkan.', 'success');
-    } catch (error) {
-        showAppToast(`QRIS tidak dapat dibatalkan: ${error.message}`, 'error', 5000);
-        await pollMidtransPaymentStatus({ manual: true });
-    }
 }
 
 function createTransaction(paymentMethod, paymentData = {}) {
@@ -2193,11 +1705,7 @@ function createTransaction(paymentMethod, paymentData = {}) {
         kembali: isQris ? 0 : cash - total,
         paymentMethod: isQris ? 'qris' : 'cash',
         paymentStatus: String(paymentData.paymentStatus || 'paid'),
-        paymentMerchant: isQris ? (settings.qrisMerchantName || 'AL - STORE') : '',
-        midtransOrderId: String(paymentData.midtransOrderId || ''),
-        midtransTransactionId: String(paymentData.midtransTransactionId || ''),
-        paymentIssuer: String(paymentData.paymentIssuer || ''),
-        paymentReference: String(paymentData.paymentReference || '')
+        paymentMerchant: isQris ? (settings.qrisMerchantName || 'AL - STORE') : ''
     };
 }
 
@@ -2248,12 +1756,6 @@ async function processSelectedPayment() {
     button.disabled = true;
 
     try {
-        if (currentPaymentMethod === 'qris' && (isMidtransQrisMode() || activeMidtransPayment)) {
-            if (activeMidtransPayment) await pollMidtransPaymentStatus({ manual: true });
-            else await startMidtransQrisPayment();
-            return;
-        }
-
         if (currentPaymentMethod === 'qris') {
             const confirmed = await showAppConfirm(
                 'Pastikan dana QRIS sudah benar-benar masuk. Setelah dikonfirmasi, stok akan berkurang dan struk langsung dicetak.',
@@ -2316,7 +1818,7 @@ async function printReceipt(textData) {
     return cetakViaRawBT(textData);
 }
 
-function buildQrisPrintText(total = 0, orderId = '') {
+function buildQrisPrintText(total = 0) {
     const settings = DB.getSettings();
     const width = 32;
     const lines = [
@@ -2327,19 +1829,16 @@ function buildQrisPrintText(total = 0, orderId = '') {
         lines.push('-'.repeat(width));
         lines.push(...centerReceiptText(`TOTAL ${formatRupiah(total)}`, width));
     }
-    if (orderId) lines.push(...centerReceiptText(`ORDER ${orderId}`, width));
     lines.push('-'.repeat(width));
     lines.push(...centerReceiptText('Scan dengan aplikasi berlogo QRIS', width));
     lines.push(...centerReceiptText('Pastikan nama merchant sesuai', width));
     return `${lines.join('\n')}\n\n`;
 }
 
-async function printQrisImage(total = 0, imageOverride = '', orderId = '') {
+async function printQrisImage(total = 0) {
     const settings = DB.getSettings();
-    const qrisImage = /^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(imageOverride)
-        ? imageOverride
-        : getQrisImageSource(settings);
-    const qrisText = buildQrisPrintText(total, orderId);
+    const qrisImage = getQrisImageSource(settings);
+    const qrisText = buildQrisPrintText(total);
     let printed = false;
 
     if (isNativePrinterAvailable() || settings.printMode === 'bluetooth') {
@@ -2366,15 +1865,7 @@ async function printCurrentQris() {
         showAppToast('Keranjang kosong. Tidak ada total QRIS untuk dicetak.', 'warning');
         return;
     }
-    if (isMidtransQrisMode() && !activeMidtransPayment) {
-        showAppToast('Buat QRIS Midtrans terlebih dahulu sebelum mencetak.', 'warning');
-        return;
-    }
-    await printQrisImage(
-        activeMidtransPayment?.amount || total,
-        activeMidtransPayment?.qrImage || '',
-        activeMidtransPayment?.orderId || ''
-    );
+    await printQrisImage(total);
 }
 
 async function executePrint() {
@@ -2438,19 +1929,13 @@ function renderHistory() {
         const itemNames = transaction.items
             .map(item => `${escapeHtml(item.name)} (${item.qty})`)
             .join(', ');
-        const paymentLabel = transaction.paymentMethod === 'qris'
-            ? (transaction.midtransOrderId ? 'QRIS MIDTRANS' : 'QRIS')
-            : 'TUNAI';
-        const midtransReference = transaction.midtransOrderId
-            ? `<p class="history-payment-ref">Order: ${escapeHtml(transaction.midtransOrderId)}</p>`
-            : '';
+        const paymentLabel = transaction.paymentMethod === 'qris' ? 'QRIS' : 'TUNAI';
         return `
             <li>
                 <div class="item-info">
                     <h4>No. Ref: ${escapeHtml(transaction.id)}</h4>
                     <p class="text-success">${escapeHtml(transaction.waktu)}</p>
                     <span class="category-badge">${paymentLabel}</span>
-                    ${midtransReference}
                     <p>${itemNames}</p>
                     <button data-reprint-index="${index}" class="btn-outline btn-small history-print">🖨️ Cetak Ulang</button>
                 </div>
@@ -2503,12 +1988,11 @@ function exportHistoryCsv() {
     }
 
     const rows = [
-        ['ID', 'Tanggal', 'Metode Pembayaran', 'Referensi Midtrans', 'Barang', 'Total', 'Tunai', 'Kembali', 'Estimasi Laba'],
+        ['ID', 'Tanggal', 'Metode Pembayaran', 'Barang', 'Total', 'Tunai', 'Kembali', 'Estimasi Laba'],
         ...histories.map(transaction => [
             transaction.id,
             transaction.waktu,
             transaction.paymentMethod === 'qris' ? 'QRIS' : 'Tunai',
-            transaction.midtransOrderId || '',
             transaction.items.map(item => `${item.name} x${item.qty}`).join('; '),
             transaction.total,
             transaction.tunai,
@@ -2714,11 +2198,6 @@ function exportBackup() {
 async function importBackup(inputElement) {
     const file = inputElement.files?.[0];
     if (!file) return;
-    if (activeMidtransPayment) {
-        showAppToast('Selesaikan atau batalkan QRIS Midtrans sebelum mengimpor backup.', 'warning', 4500);
-        inputElement.value = '';
-        return;
-    }
     try {
         const confirmed = await showAppConfirm(
             'Impor backup akan mengganti data barang, riwayat, logo, template, dan pengaturan yang ada. Lanjutkan?',
@@ -2742,6 +2221,15 @@ async function importBackup(inputElement) {
 }
 
 // ================= INIT & CLEANUP =================
+function cleanupLegacyPaymentIntegration() {
+    try {
+        localStorage.removeItem('warungscan_midtrans_app_token');
+        localStorage.removeItem('kasir_pending_midtrans');
+    } catch (error) {
+        console.debug('Data integrasi pembayaran lama tidak dapat dibersihkan.', error);
+    }
+}
+
 function initializeNativeDefaults() {
     try {
         if (!window.WarungScanNative?.isNativeApp?.()) return;
@@ -2759,16 +2247,12 @@ function initializeNativeDefaults() {
 
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-        clearMidtransPollTimer();
         stopScanner();
         closeProductCamera();
         closeProductBarcodeScanner();
-    } else if (activeMidtransPayment) {
-        pollMidtransPaymentStatus({ automatic: true });
     }
 });
 window.addEventListener('pagehide', () => {
-    clearMidtransPollTimer();
     stopScanner();
     closeProductCamera();
     closeProductBarcodeScanner();
@@ -2783,14 +2267,10 @@ systemThemeQuery?.addEventListener?.('change', () => {
     if (DB.getSettings().displayMode === 'auto') applyAppTheme();
 });
 
+cleanupLegacyPaymentIntegration();
 initializeNativeDefaults();
-const restoredMidtransPayment = restorePendingMidtransPayment();
 applyAppTheme();
 renderProducts();
 renderCart();
 updateDashboardStats();
 loadSettingsUI();
-if (restoredMidtransPayment) {
-    showAppToast('QRIS Midtrans yang masih menunggu berhasil dipulihkan.', 'info', 4500);
-    scheduleMidtransPaymentPoll(1200);
-}

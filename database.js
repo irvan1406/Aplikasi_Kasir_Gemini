@@ -3,8 +3,7 @@ const DB = (() => {
     const KEYS = {
         products: 'kasir_products',
         history: 'kasir_history',
-        settings: 'kasir_settings',
-        pendingMidtrans: 'kasir_pending_midtrans'
+        settings: 'kasir_settings'
     };
 
     const defaultSettings = {
@@ -15,8 +14,6 @@ const DB = (() => {
         displayMode: 'light',
         qrisMerchantName: 'AL - STORE',
         qrisImageBase64: '',
-        qrisMode: 'manual',
-        midtransBackendUrl: '',
         lastPaymentMethod: 'cash',
         receiptTemplate: 'classic',
         headerText: 'WARUNGSCAN',
@@ -28,6 +25,13 @@ const DB = (() => {
 
     function clone(value) {
         return JSON.parse(JSON.stringify(value));
+    }
+
+    function normalizeSettings(settingsObj) {
+        const settings = { ...defaultSettings, ...(settingsObj && typeof settingsObj === 'object' ? settingsObj : {}) };
+        delete settings.qrisMode;
+        delete settings.midtransBackendUrl;
+        return settings;
     }
 
     function notify(message, type = 'error') {
@@ -121,7 +125,7 @@ const DB = (() => {
 
     function getSettings() {
         const settings = safeRead(KEYS.settings, {});
-        return { ...defaultSettings, ...(settings && typeof settings === 'object' ? settings : {}) };
+        return normalizeSettings(settings);
     }
 
     function saveProduct(product, previousBarcode = null) {
@@ -194,41 +198,7 @@ const DB = (() => {
     }
 
     function saveSettings(settingsObj) {
-        return write(KEYS.settings, { ...defaultSettings, ...(settingsObj || {}) });
-    }
-
-    function getPendingMidtransPayment() {
-        const payment = safeRead(KEYS.pendingMidtrans, null);
-        if (!payment || typeof payment !== 'object') return null;
-        const orderId = String(payment.orderId || '').trim();
-        const amount = Math.max(0, Number(payment.amount) || 0);
-        if (!orderId || !amount || !Array.isArray(payment.items)) return null;
-        return {
-            ...payment,
-            orderId,
-            transactionId: String(payment.transactionId || ''),
-            amount,
-            qrImage: typeof payment.qrImage === 'string' ? payment.qrImage : '',
-            qrUrl: typeof payment.qrUrl === 'string' ? payment.qrUrl : '',
-            expiryTime: String(payment.expiryTime || ''),
-            status: String(payment.status || 'pending'),
-            createdAt: Number(payment.createdAt) || Date.now(),
-            items: payment.items.map(normalizeProductItem)
-        };
-    }
-
-    function savePendingMidtransPayment(payment) {
-        return write(KEYS.pendingMidtrans, payment, false);
-    }
-
-    function clearPendingMidtransPayment() {
-        try {
-            localStorage.removeItem(KEYS.pendingMidtrans);
-            return true;
-        } catch (error) {
-            console.error('Gagal membersihkan transaksi Midtrans tertunda.', error);
-            return false;
-        }
+        return write(KEYS.settings, normalizeSettings(settingsObj));
     }
 
     function exportData() {
@@ -256,7 +226,7 @@ const DB = (() => {
         try {
             localStorage.setItem(KEYS.products, JSON.stringify(parsed.products.map(normalizeProduct)));
             localStorage.setItem(KEYS.history, JSON.stringify(parsed.history.map(normalizeTransaction)));
-            localStorage.setItem(KEYS.settings, JSON.stringify({ ...defaultSettings, ...(parsed.settings || {}) }));
+            localStorage.setItem(KEYS.settings, JSON.stringify(normalizeSettings(parsed.settings)));
             return true;
         } catch (error) {
             restoreRaw(KEYS.products, previous.products);
@@ -277,9 +247,6 @@ const DB = (() => {
         clearHistory,
         getSettings,
         saveSettings,
-        getPendingMidtransPayment,
-        savePendingMidtransPayment,
-        clearPendingMidtransPayment,
         exportData,
         importData
     };

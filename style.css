@@ -269,29 +269,6 @@ button:disabled { opacity: 0.55; cursor: wait; transform: none; }
 /* PEMBAYARAN TUNAI & QRIS */
 .section-header-plain { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .qris-ready-badge { padding: 5px 9px; border-radius: 20px; background: #dcfce7; color: #166534; font-size: 10px; font-weight: 800; }
-.qris-ready-badge.is-auto { background: #dbeafe; color: #1d4ed8; }
-.midtrans-settings-panel { margin-top: 14px; padding: 14px; border: 1px solid rgba(var(--brand-primary-rgb), 0.2); border-radius: 16px; background: var(--bg-main); }
-.midtrans-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.midtrans-panel-heading > div { display: flex; flex-direction: column; gap: 3px; }
-.midtrans-panel-heading strong { color: var(--text-dark); font-size: 14px; }
-.midtrans-panel-heading small { color: var(--text-muted); font-size: 10px; line-height: 1.45; }
-.connection-dot { width: 11px; height: 11px; flex: 0 0 11px; margin-top: 3px; border-radius: 50%; background: #94a3b8; box-shadow: 0 0 0 4px rgba(148,163,184,0.16); }
-.connection-dot.is-online { background: #10b981; box-shadow: 0 0 0 4px rgba(16,185,129,0.16); }
-.connection-dot.is-error { background: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,0.15); }
-.token-input-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; align-items: stretch; }
-.token-input-row .modern-input { min-width: 0; }
-.token-input-row button { padding: 10px; white-space: nowrap; }
-.webhook-copy-box { display: flex; align-items: stretch; gap: 7px; }
-.webhook-copy-box code { min-width: 0; flex: 1; padding: 11px; border: 1px dashed var(--border-line); border-radius: 10px; background: var(--bg-card); color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9px; line-height: 1.4; overflow-wrap: anywhere; }
-.webhook-copy-box button { flex: 0 0 auto; padding: 10px; border-radius: 10px; background: var(--brand-primary); color: white; }
-.midtrans-actions { display: grid; grid-template-columns: 1fr auto; align-items: stretch; gap: 8px; margin-top: 12px; }
-.btn-link-guide { display: flex; align-items: center; justify-content: center; padding: 10px; border: 1px solid var(--border-line); border-radius: var(--radius-md); background: var(--bg-card); color: var(--text-dark); font-size: 11px; font-weight: 700; text-decoration: none; }
-.integration-status { margin-top: 10px; padding: 9px 11px; border-radius: 10px; font-size: 10px; line-height: 1.45; }
-.integration-status.is-idle { background: var(--bg-card); color: var(--text-muted); }
-.integration-status.is-loading { background: #eff6ff; color: #1d4ed8; }
-.integration-status.is-success { background: #ecfdf5; color: #047857; }
-.integration-status.is-error { background: #fef2f2; color: #b91c1c; }
-.qris-fallback-divider { margin-top: 18px; }
 .qris-settings-preview {
     width: min(100%, 300px); margin: 16px auto; padding: 16px; border: 1px solid var(--border-line); border-radius: 18px;
     background: #fff; color: #111827; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 5px;
@@ -314,22 +291,15 @@ button:disabled { opacity: 0.55; cursor: wait; transform: none; }
 .qris-payment-card > span:not(.qris-label) { color: #64748b; font-size: 10px; }
 .qris-payment-card #qris-payment-total { color: var(--brand-primary); font-size: 23px; }
 .qris-payment-card small { color: #64748b; font-size: 9px; line-height: 1.45; }
-.qris-payment-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
+.qris-payment-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
 .qris-payment-actions button { min-width: 0; width: 100%; padding: 11px 8px; font-size: 11px; }
-.qris-payment-actions .qris-cancel-button { grid-column: 1 / -1; color: var(--brand-danger); }
 .qris-print-button { margin-top: 0; }
 .qris-confirm-note { margin-top: 10px; padding: 10px; border-radius: 10px; background: #fffbeb; color: #92400e; font-size: 10px; line-height: 1.5; text-align: center; }
-.qris-auto-status { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 11px; border-radius: 12px; }
-.qris-auto-status > div { display: flex; flex-direction: column; gap: 2px; }
-.qris-auto-status strong { font-size: 11px; }
-.qris-auto-status small { font-size: 9px; line-height: 1.4; }
-.qris-auto-status.is-idle { background: var(--bg-main); color: var(--text-muted); }
-.qris-auto-status.is-loading, .qris-auto-status.is-pending { background: #eff6ff; color: #1d4ed8; }
-.qris-auto-status.is-success { background: #ecfdf5; color: #047857; }
-.qris-auto-status.is-error { background: #fef2f2; color: #b91c1c; }
+.qris-manual-status { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 11px; border-radius: 12px; background: var(--bg-main); color: var(--text-muted); }
+.qris-manual-status > div { display: flex; flex-direction: column; gap: 2px; }
+.qris-manual-status strong { font-size: 11px; }
+.qris-manual-status small { font-size: 9px; line-height: 1.4; }
 .qris-status-pulse { width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; background: currentColor; opacity: 0.75; }
-.qris-auto-status.is-loading .qris-status-pulse, .qris-auto-status.is-pending .qris-status-pulse { animation: qrisPulse 1.25s ease-in-out infinite; }
-@keyframes qrisPulse { 0%, 100% { opacity: 0.3; transform: scale(0.82); } 50% { opacity: 1; transform: scale(1.08); } }
 
 /* SCANNER FORM BARANG */
 .scanner-dialog { max-width: 520px; text-align: center; }
@@ -415,7 +385,6 @@ button:disabled { opacity: 0.55; cursor: wait; transform: none; }
 .history-toolbar { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 0 16px 16px; }
 .danger-zone { display: flex; justify-content: center; padding: 0 16px 16px; }
 .history-print { margin-top: 8px; width: fit-content; }
-.history-payment-ref { margin-top: 5px; color: var(--text-muted); font-size: 9px; overflow-wrap: anywhere; }
 
 /* Scanner Area */
 .scanner-box { width: 100%; min-height: 250px; background: #111; border-radius: var(--radius-md); overflow: hidden; position: relative; }
@@ -435,8 +404,6 @@ button:disabled { opacity: 0.55; cursor: wait; transform: none; }
     .modal-backdrop { padding: 8px; }
     .modal-dialog { padding: 18px; max-height: calc(100vh - 16px); }
     .backup-actions { grid-template-columns: 1fr; }
-    .midtrans-actions { grid-template-columns: 1fr; }
-    .token-input-row { grid-template-columns: 1fr; }
     .dashboard-panel { padding: 15px; }
     .dashboard-panel-header { align-items: flex-start; }
     .dashboard-panel-header .btn-pill-light { white-space: nowrap; }
