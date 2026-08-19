@@ -1,5 +1,5 @@
-// printer-bluetooth.js - Transport Bluetooth LE ESC/POS opsional.
-// RawBT tetap menjadi mode bawaan karena lebih kompatibel dengan APK/WebView.
+// Transport ESC/POS: Android native memakai Bluetooth Classic SPP untuk RPP02N.
+// Browser biasa tetap dapat memakai Web Bluetooth LE atau RawBT sebagai cadangan.
 
 const PRINTER_SERVICE_UUIDS = [
     '000018f0-0000-1000-8000-00805f9b34fb',
@@ -10,6 +10,93 @@ const PRINTER_SERVICE_UUIDS = [
 
 let bluetoothDevice = null;
 let printCharacteristic = null;
+let nativePrinterConnected = false;
+const nativePrinterRequests = new Map();
+
+function getNativePrinterBridge() {
+    try {
+        return window.WarungScanNative || null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function isNativePrinterAvailable() {
+    const bridge = getNativePrinterBridge();
+    try {
+        return Boolean(bridge?.isNativeApp?.() && bridge?.isBluetoothSupported?.());
+    } catch (error) {
+        return false;
+    }
+}
+
+function isNativePrinterConnected() {
+    const bridge = getNativePrinterBridge();
+    try {
+        return nativePrinterConnected || Boolean(bridge?.isPrinterConnected?.());
+    } catch (error) {
+        return nativePrinterConnected;
+    }
+}
+
+function callNativePrinter(method, payload = '') {
+    const bridge = getNativePrinterBridge();
+    if (!bridge) return Promise.reject(new Error('Jembatan Android tidak tersedia.'));
+
+    return new Promise((resolve, reject) => {
+        const requestId = `printer-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const timeout = setTimeout(() => {
+            nativePrinterRequests.delete(requestId);
+            reject(new Error('Printer tidak merespons. Pastikan RPP02N menyala dan sudah dipasangkan.'));
+        }, 30000);
+
+        nativePrinterRequests.set(requestId, { resolve, reject, timeout });
+        try {
+            if (method === 'connect') bridge.connectPrinter(requestId);
+            else if (method === 'disconnect') bridge.disconnectPrinter(requestId);
+            else if (method === 'print') bridge.printBase64(requestId, payload);
+            else throw new Error('Perintah printer native tidak dikenal.');
+        } catch (error) {
+            clearTimeout(timeout);
+            nativePrinterRequests.delete(requestId);
+            reject(error);
+        }
+    });
+}
+
+window.__warungScanNativeResult = function nativePrinterResult(
+    requestId,
+    success,
+    message,
+    printerName
+) {
+    const pending = nativePrinterRequests.get(requestId);
+    if (!pending) return;
+    clearTimeout(pending.timeout);
+    nativePrinterRequests.delete(requestId);
+    if (success) pending.resolve({ message, printerName });
+    else pending.reject(new Error(message || 'Perintah printer gagal.'));
+};
+
+function concatenateBytes(parts) {
+    const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+    const output = new Uint8Array(totalLength);
+    let offset = 0;
+    parts.forEach(part => {
+        output.set(part, offset);
+        offset += part.length;
+    });
+    return output;
+}
+
+function bytesToBase64(bytes) {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+    }
+    return btoa(binary);
+}
 
 function updatePrinterStatus(message, connected = false) {
     const status = document.getElementById('status-printer');
@@ -22,6 +109,7 @@ function updatePrinterStatus(message, connected = false) {
 
 function handleBluetoothDisconnected() {
     printCharacteristic = null;
+    nativePrinterConnected = false;
     updatePrinterStatus('Printer Bluetooth terputus', false);
 }
 
@@ -42,6 +130,22 @@ async function findWritableCharacteristic(server) {
 }
 
 async function connectBluetoothPrinter() {
+    if (isNativePrinterAvailable()) {
+        try {
+            updatePrinterStatus('Menghubungkan RPP02N…', false);
+            const result = await callNativePrinter('connect');
+            nativePrinterConnected = true;
+            updatePrinterStatus(`Terhubung: ${result.printerName || 'RPP02N'}`, true);
+            return true;
+        } catch (error) {
+            nativePrinterConnected = false;
+            console.error('Gagal menghubungkan printer native.', error);
+            updatePrinterStatus('RPP02N belum terhubung', false);
+            alert(`Gagal konek RPP02N: ${error.message}`);
+            return false;
+        }
+    }
+
     if (!navigator.bluetooth) {
         alert('Web Bluetooth tidak tersedia di browser/APK ini. Pilih mode RawBT pada pengaturan printer.');
         updatePrinterStatus('Web Bluetooth tidak didukung', false);
@@ -76,7 +180,18 @@ async function connectBluetoothPrinter() {
     }
 }
 
-function disconnectBluetoothPrinter() {
+async function disconnectBluetoothPrinter() {
+    if (isNativePrinterAvailable()) {
+        try {
+            await callNativePrinter('disconnect');
+        } catch (error) {
+            console.debug('Printer native sudah terputus.', error);
+        }
+        nativePrinterConnected = false;
+        updatePrinterStatus('RPP02N belum terhubung', false);
+        return;
+    }
+
     if (bluetoothDevice?.gatt?.connected) bluetoothDevice.gatt.disconnect();
     bluetoothDevice = null;
     printCharacteristic = null;
@@ -139,6 +254,35 @@ async function generateLogoRaster(base64Logo) {
 }
 
 async function connectAndPrintBluetooth(customReceiptText, logoBase64) {
+    if (isNativePrinterAvailable()) {
+        try {
+            if (!isNativePrinterConnected()) {
+                const connected = await connectBluetoothPrinter();
+                if (!connected) return false;
+            }
+
+            const parts = [];
+            if (logoBase64) {
+                parts.push(new Uint8Array([0x1B, 0x40, 0x1B, 0x61, 0x01]));
+                const logoBytes = await generateLogoRaster(logoBase64);
+                if (logoBytes.length) parts.push(logoBytes);
+            }
+            parts.push(new Uint8Array([0x1B, 0x40, 0x1B, 0x61, 0x00]));
+            parts.push(new TextEncoder().encode(`${customReceiptText}\n\n\n`));
+
+            const result = await callNativePrinter('print', bytesToBase64(concatenateBytes(parts)));
+            nativePrinterConnected = true;
+            updatePrinterStatus(`Terhubung: ${result.printerName || 'RPP02N'}`, true);
+            return true;
+        } catch (error) {
+            nativePrinterConnected = false;
+            console.error('Gagal mencetak melalui Android native.', error);
+            updatePrinterStatus('Gagal mencetak ke RPP02N', false);
+            alert(`Gagal print: ${error.message}`);
+            return false;
+        }
+    }
+
     try {
         if (!bluetoothDevice?.gatt?.connected || !printCharacteristic) {
             const connected = await connectBluetoothPrinter();
