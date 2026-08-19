@@ -38,6 +38,21 @@ Perubahan pada `index.html`, `app.js`, `style.css`, dan `database.js` dimuat dar
 
 QRIS statis memakai konfirmasi manual dan tidak membutuhkan backend, API key, webhook, atau akun Vercel.
 
+## Bon, pelanggan, dan label barcode
+
+- Nama dan nomor HP pelanggan dapat dicatat secara opsional pada transaksi Tunai/QRIS dan wajib pada Bon.
+- Buku Bon menyimpan hutang awal, jatuh tempo, catatan, seluruh cicilan, cara bayar, sisa, dan status lunas.
+- Data piutang dapat diekspor ke CSV dan catatan/cicilan dapat dicetak ke RPP02N.
+- Tombol **Label** pada katalog membuat barcode CODE128 berisi nama dan harga untuk kertas thermal 58 mm.
+
+## Sinkronisasi Firebase banyak HP
+
+Warung Scan tetap bekerja dengan penyimpanan lokal. Setelah Firebase disiapkan, produk, transaksi, pelanggan, piutang, cicilan, dan pengaturan toko disinkronkan pada HP yang masuk menggunakan akun toko yang sama.
+
+Panduan lengkap lewat HP: [firebase-setup.html](firebase-setup.html). Aturan keamanan siap ditempel tersedia di [firestore.rules](firestore.rules).
+
+Jangan menyimpan private key, Server Key, atau kata sandi di repository maupun kolom konfigurasi aplikasi.
+
 ## Memindahkan data dari aplikasi lama
 
 1. Buka **Pengaturan → Ekspor Backup** pada aplikasi lama.

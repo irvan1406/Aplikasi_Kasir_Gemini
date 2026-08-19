@@ -386,6 +386,92 @@ button:disabled { opacity: 0.55; cursor: wait; transform: none; }
 .danger-zone { display: flex; justify-content: center; padding: 0 16px 16px; }
 .history-print { margin-top: 8px; width: fit-content; }
 
+/* STATUS SINKRON HEADER */
+.status-indicator[data-sync-state="syncing"] { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.28); animation: syncPulse 1s infinite; }
+.status-indicator[data-sync-state="offline"],
+.status-indicator[data-sync-state="error"] { background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.24); }
+.status-indicator[data-sync-state="signed-out"],
+.status-indicator[data-sync-state="unconfigured"] { background: #94a3b8; box-shadow: 0 0 0 3px rgba(148,163,184,0.24); }
+@keyframes syncPulse { 50% { opacity: 0.45; } }
+
+/* RINGKASAN PIUTANG BERANDA */
+.debt-home-panel { background: linear-gradient(145deg, #fff7ed, var(--bg-card)); }
+html[data-effective-mode="dark"] .debt-home-panel { background: linear-gradient(145deg, #422006, var(--bg-card)); }
+.debt-home-summary { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5px 10px; }
+.debt-home-summary strong { color: #c2410c; font-size: 24px; }
+.debt-home-summary span { color: var(--text-dark); font-size: 12px; font-weight: 800; }
+.debt-home-summary small { grid-column: 1 / -1; color: var(--text-muted); font-size: 11px; }
+
+/* PELANGGAN & METODE BON */
+.checkout-customer-box { margin-bottom: 16px; padding: 13px; border-radius: var(--radius-md); background: var(--bg-main); }
+.checkout-customer-box .input-label { margin-top: 0; }
+.checkout-customer-box .modern-input + .modern-input { margin-top: 8px; }
+.checkout-customer-box .helper-text { margin-top: 7px; }
+.payment-method-tabs { grid-template-columns: repeat(3, 1fr); }
+.payment-method-tabs button { min-width: 0; padding: 12px 7px; font-size: 12px; }
+.credit-info-box { margin-bottom: 10px; padding: 13px; border: 1px solid #fed7aa; border-radius: var(--radius-md); background: #fff7ed; color: #9a3412; }
+.credit-info-box strong { display: block; font-size: 13px; margin-bottom: 4px; }
+.credit-info-box p { font-size: 10px; line-height: 1.5; }
+html[data-effective-mode="dark"] .credit-info-box { background: #431407; border-color: #7c2d12; color: #fdba74; }
+
+/* BUKU BON & RIWAYAT CICILAN */
+.debt-summary-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.debt-summary-card { min-width: 0; padding: 14px; border: 1px solid var(--border-line); border-radius: var(--radius-md); background: var(--bg-card); box-shadow: var(--shadow-soft); display: flex; flex-direction: column; gap: 7px; }
+.debt-summary-card span { color: var(--text-muted); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.debt-summary-card strong { color: var(--text-dark); font-size: 15px; overflow-wrap: anywhere; }
+.debt-summary-primary { background: var(--brand-primary); border-color: var(--brand-primary); }
+.debt-summary-primary span, .debt-summary-primary strong { color: white; }
+.debt-toolbar { display: grid; grid-template-columns: 1fr 160px auto; gap: 8px; padding: 0 16px 16px; }
+.debt-list .debt-card-item { display: block; padding: 17px 0; }
+.debt-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.debt-card-head h4 { color: var(--text-dark); font-size: 16px; margin: 2px 0 4px; }
+.debt-card-head p { color: var(--text-muted); font-size: 11px; }
+.debt-remaining { color: #c2410c; font-size: 17px; white-space: nowrap; }
+.debt-status-unpaid { background: #fee2e2; color: #b91c1c; }
+.debt-status-partial { background: #fef3c7; color: #92400e; }
+.debt-status-paid { background: #dcfce7; color: #166534; }
+.debt-overdue-badge { margin-left: 4px; background: #7f1d1d; color: white; }
+.debt-amount-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 13px; }
+.debt-amount-grid > div { min-width: 0; padding: 9px; border-radius: 9px; background: var(--bg-main); display: flex; flex-direction: column; gap: 4px; }
+.debt-amount-grid span { color: var(--text-muted); font-size: 8px; text-transform: uppercase; }
+.debt-amount-grid strong { color: var(--text-dark); font-size: 11px; overflow-wrap: anywhere; }
+.debt-note { margin-top: 10px; padding: 9px 11px; border-radius: 9px; background: var(--bg-main); color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+.debt-details { margin-top: 10px; color: var(--text-muted); }
+.debt-details summary { cursor: pointer; font-size: 11px; font-weight: 700; }
+.debt-payment-history { margin-top: 7px; padding-left: 9px; border-left: 3px solid var(--border-line); }
+.debt-payment-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 7px 0; border-bottom: 1px dashed var(--border-line); font-size: 10px; }
+.debt-payment-row small { grid-column: 1 / -1; color: var(--text-muted); }
+.debt-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.debt-actions button { min-width: 0; padding: 10px 8px; font-size: 11px; }
+.debt-modal-icon { width: 48px; height: 48px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; border-radius: 16px; background: #dcfce7; color: #166534; font-size: 22px; font-weight: 900; }
+
+/* LABEL BARCODE */
+.barcode-label-dialog { max-width: 480px; }
+.barcode-label-preview { width: 100%; overflow-x: auto; padding: 10px; border-radius: var(--radius-md); background: #e5e7eb; text-align: center; }
+.barcode-label-preview canvas { display: block; width: 100%; max-width: 384px; height: auto; margin: 0 auto; background: white; image-rendering: pixelated; }
+.label-options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 4px; }
+.toggle-option { display: flex; align-items: center; gap: 8px; padding: 11px; border: 1px solid var(--border-line); border-radius: 10px; background: var(--bg-main); color: var(--text-dark); font-size: 11px; font-weight: 700; }
+.toggle-option input { width: 18px; height: 18px; accent-color: var(--brand-primary); }
+
+/* FIREBASE */
+.firebase-settings-card { border-color: rgba(var(--brand-primary-rgb), 0.28); }
+.firebase-sync-badge { flex: 0 0 auto; padding: 5px 9px; border-radius: 20px; background: #e2e8f0; color: #475569; font-size: 9px; font-weight: 800; }
+.firebase-sync-badge[data-state="online"] { background: #dcfce7; color: #166534; }
+.firebase-sync-badge[data-state="syncing"] { background: #fef3c7; color: #92400e; }
+.firebase-sync-badge[data-state="offline"], .firebase-sync-badge[data-state="error"] { background: #fee2e2; color: #b91c1c; }
+.firebase-status { margin-top: 14px; padding: 11px 12px; border-radius: 10px; background: var(--bg-main); color: var(--text-muted); font-size: 11px; line-height: 1.5; font-weight: 600; }
+.firebase-status-online { background: #ecfdf5; color: #047857; }
+.firebase-status-syncing { background: #fffbeb; color: #b45309; }
+.firebase-status-error, .firebase-status-offline { background: #fef2f2; color: #b91c1c; }
+.firebase-account-label { margin-top: 8px; }
+.firebase-config-input { font-family: monospace; font-size: 11px; line-height: 1.5; resize: vertical; }
+.firebase-config-actions, .firebase-auth-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.firebase-guide { margin-top: 14px; padding: 12px; border: 1px solid var(--border-line); border-radius: var(--radius-md); background: var(--bg-main); }
+.firebase-guide summary { cursor: pointer; color: var(--text-dark); font-size: 12px; font-weight: 800; }
+.firebase-guide ol { margin: 12px 0 0 20px; color: var(--text-muted); font-size: 11px; line-height: 1.65; }
+.firebase-guide a { color: var(--brand-primary); }
+.firebase-guide-link { display: block; margin-top: 10px; font-size: 11px; font-weight: 800; }
+
 /* Scanner Area */
 .scanner-box { width: 100%; min-height: 250px; background: #111; border-radius: var(--radius-md); overflow: hidden; position: relative; }
 .scanner-box + .flex-row + .helper-text { margin-top: 10px; text-align: center; }
@@ -410,6 +496,12 @@ button:disabled { opacity: 0.55; cursor: wait; transform: none; }
     .catalog-filters { grid-template-columns: 1fr; }
     .catalog-filters #search-input { grid-column: auto; }
     .scanner-box-modal { min-height: 245px; }
+    .debt-summary-grid { grid-template-columns: 1fr 1fr; }
+    .debt-summary-primary { grid-column: 1 / -1; }
+    .debt-toolbar { grid-template-columns: 1fr; }
+    .debt-amount-grid { grid-template-columns: 1fr 1fr; }
+    .debt-card-head { flex-direction: column; }
+    .debt-actions, .firebase-config-actions, .firebase-auth-actions { grid-template-columns: 1fr; }
 }
 
 /* AREA PRINT FALLBACK */

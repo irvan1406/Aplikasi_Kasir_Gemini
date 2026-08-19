@@ -4,6 +4,9 @@ let editingBarcode = null;
 let currentPage = 'page-home';
 let currentPaymentMethod = 'cash';
 let paymentProcessing = false;
+let activeDebtId = null;
+let activeLabelBarcode = null;
+let firebaseStatusState = 'unconfigured';
 
 let html5QrcodeScanner = null;
 let scannerStarting = false;
@@ -457,6 +460,7 @@ function switchTab(tabId, options = {}) {
     if (tabId === 'page-home') updateDashboardStats();
     if (tabId === 'page-barang') renderProducts();
     if (tabId === 'page-riwayat') renderHistory();
+    if (tabId === 'page-piutang') renderDebts();
     if (tabId === 'page-pengaturan') loadSettingsUI();
 
     window.scrollTo({ top: 0, behavior: 'auto' });
@@ -477,6 +481,18 @@ function closeVisibleOverlayForBack() {
     const productCameraModal = document.getElementById('product-camera-modal');
     if (productCameraModal?.style.display === 'flex') {
         closeProductCamera();
+        return true;
+    }
+
+    const debtPaymentModal = document.getElementById('debt-payment-modal');
+    if (debtPaymentModal?.style.display === 'flex') {
+        closeDebtPaymentModal();
+        return true;
+    }
+
+    const barcodeLabelModal = document.getElementById('barcode-label-modal');
+    if (barcodeLabelModal?.style.display === 'flex') {
+        closeBarcodeLabel();
         return true;
     }
 
@@ -540,6 +556,20 @@ function actionRiwayat() {
     switchTab('page-riwayat');
 }
 
+function actionPiutang() {
+    switchTab('page-piutang');
+}
+
+async function actionLabels() {
+    switchTab('page-barang');
+    await setAdminMode(false);
+    document.getElementById('search-input').value = '';
+    document.getElementById('filter-category').value = '';
+    document.getElementById('filter-stock').value = '';
+    renderProducts();
+    showAppToast('Pilih tombol Label pada barang yang ingin dicetak.', 'info');
+}
+
 function updateDashboardStats() {
     const products = DB.getProducts();
     const lowStock = products.filter(product => product.stok > 0 && product.stok <= 5).length;
@@ -564,6 +594,18 @@ function updateDashboardStats() {
     document.getElementById('home-today-average').textContent = formatRupiah(
         todayHistory.length ? todayRevenue / todayHistory.length : 0
     );
+
+    const openDebts = DB.getDebts().filter(debt => debt.remainingAmount > 0);
+    const debtTotal = openDebts.reduce((sum, debt) => sum + Number(debt.remainingAmount || 0), 0);
+    const debtCustomers = new Set(openDebts.map(debt => debt.customerId || debt.customerName)).size;
+    const today = getLocalDateKey();
+    const overdueCount = openDebts.filter(debt => debt.dueDate && debt.dueDate < today).length;
+    const debtTotalElement = document.getElementById('home-debt-total');
+    if (debtTotalElement) debtTotalElement.textContent = formatRupiah(debtTotal);
+    const debtCustomersElement = document.getElementById('home-debt-customers');
+    if (debtCustomersElement) debtCustomersElement.textContent = `${debtCustomers} pelanggan`;
+    const debtOverdueElement = document.getElementById('home-debt-overdue');
+    if (debtOverdueElement) debtOverdueElement.textContent = overdueCount ? `${overdueCount} lewat jatuh tempo` : 'Tidak ada yang terlambat';
 
     const criticalProducts = products
         .filter(product => product.stok <= 5)
@@ -682,6 +724,7 @@ function loadSettingsUI() {
     updatePrintModeUI();
     updateReceiptTemplateUI();
     updateThemeUI();
+    loadFirebaseSettingsUI();
 }
 
 async function handleLogoUpload() {
@@ -756,6 +799,168 @@ function saveSettings() {
     DB.saveSettings(settings);
     document.getElementById('setting-qris-preview-name').textContent = settings.qrisMerchantName;
     updateReceiptTemplateUI();
+}
+
+function parseFirebaseConfigText(value) {
+    const text = String(value || '').trim();
+    if (!text) throw new Error('Tempel konfigurasi Firebase terlebih dahulu.');
+
+    let parsed = null;
+    try {
+        parsed = JSON.parse(text);
+    } catch (error) {
+        const result = {};
+        ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'].forEach(key => {
+            const match = text.match(new RegExp(`${key}\\s*:\\s*["']([^"']+)["']`));
+            if (match) result[key] = match[1];
+        });
+        parsed = result;
+    }
+
+    const config = {
+        apiKey: String(parsed?.apiKey || '').trim(),
+        authDomain: String(parsed?.authDomain || '').trim(),
+        projectId: String(parsed?.projectId || '').trim(),
+        storageBucket: String(parsed?.storageBucket || '').trim(),
+        messagingSenderId: String(parsed?.messagingSenderId || '').trim(),
+        appId: String(parsed?.appId || '').trim()
+    };
+    if (!config.apiKey || !config.authDomain || !config.projectId || !config.appId) {
+        throw new Error('Konfigurasi belum lengkap. Pastikan apiKey, authDomain, projectId, dan appId ikut ditempel.');
+    }
+    return config;
+}
+
+function loadFirebaseSettingsUI() {
+    const configInput = document.getElementById('setting-firebase-config');
+    if (!configInput) return;
+    const settings = DB.getSettings();
+    if (document.activeElement !== configInput) {
+        configInput.value = settings.firebaseConfig ? JSON.stringify(settings.firebaseConfig, null, 2) : '';
+    }
+    const configured = Boolean(settings.firebaseConfig?.apiKey && settings.firebaseConfig?.projectId);
+    document.getElementById('firebase-auth-fields').style.display = configured ? 'block' : 'none';
+    document.getElementById('firebase-remove-config').style.display = configured ? 'flex' : 'none';
+    if (firebaseStatusState === 'unconfigured') {
+        setFirebaseStatus(configured
+            ? { state: 'signed-out', message: 'Konfigurasi tersimpan. Menunggu koneksi Firebase…' }
+            : { state: 'unconfigured', message: 'Firebase belum dikonfigurasi. Data tetap tersimpan di HP ini.' });
+    }
+}
+
+function setFirebaseStatus(detail = {}) {
+    firebaseStatusState = detail.state || firebaseStatusState;
+    const status = document.getElementById('firebase-sync-status');
+    const badge = document.getElementById('firebase-sync-badge');
+    const account = document.getElementById('firebase-account-label');
+    const indicator = document.querySelector('.status-indicator');
+    if (status) {
+        status.textContent = detail.message || 'Status Firebase belum tersedia.';
+        status.className = `firebase-status firebase-status-${firebaseStatusState}`;
+    }
+    if (badge) {
+        const labels = {
+            online: 'Tersinkron', syncing: 'Menyinkronkan', offline: 'Offline', error: 'Perlu Dicek',
+            'signed-out': 'Belum Masuk', unconfigured: 'Belum Diatur'
+        };
+        badge.textContent = labels[firebaseStatusState] || 'Lokal';
+        badge.dataset.state = firebaseStatusState;
+    }
+    if (account) account.textContent = detail.email ? `Akun: ${detail.email}` : 'Belum ada akun yang masuk.';
+    if (indicator) indicator.dataset.syncState = firebaseStatusState;
+
+    const signedIn = Boolean(detail.email) && ['online', 'syncing', 'offline', 'error'].includes(firebaseStatusState);
+    const authActions = document.getElementById('firebase-auth-actions');
+    const signedInActions = document.getElementById('firebase-signed-in-actions');
+    if (authActions) authActions.style.display = signedIn ? 'none' : 'grid';
+    if (signedInActions) signedInActions.style.display = signedIn ? 'grid' : 'none';
+}
+window.setFirebaseStatus = setFirebaseStatus;
+
+async function saveFirebaseConfiguration() {
+    try {
+        const config = parseFirebaseConfigText(document.getElementById('setting-firebase-config').value);
+        const settings = DB.getSettings();
+        settings.firebaseConfig = config;
+        if (!DB.saveSettings(settings)) throw new Error('Konfigurasi gagal disimpan di HP.');
+        showAppToast('Konfigurasi Firebase tersimpan. Aplikasi dimuat ulang…', 'success');
+        setTimeout(() => window.location.reload(), 650);
+    } catch (error) {
+        showAppToast(error.message || 'Konfigurasi Firebase tidak valid.', 'error', 4800);
+    }
+}
+
+function getFirebaseCredentials() {
+    const email = document.getElementById('firebase-email').value.trim();
+    const password = document.getElementById('firebase-password').value;
+    if (!email || !password) throw new Error('Isi email dan kata sandi akun toko.');
+    if (password.length < 6) throw new Error('Kata sandi minimal 6 karakter.');
+    return { email, password };
+}
+
+async function firebaseSignIn() {
+    try {
+        const credentials = getFirebaseCredentials();
+        if (!window.FirebaseSync) throw new Error('Modul Firebase belum siap. Pastikan internet aktif lalu buka ulang aplikasi.');
+        await window.FirebaseSync.signIn(credentials.email, credentials.password);
+        document.getElementById('firebase-password').value = '';
+        showAppToast('Berhasil masuk. Data sedang disinkronkan.', 'success');
+    } catch (error) {
+        showAppToast(error.message || 'Gagal masuk ke Firebase.', 'error', 4800);
+    }
+}
+
+async function firebaseSignUp() {
+    try {
+        const credentials = getFirebaseCredentials();
+        const confirmed = await showAppConfirm(
+            'Buat satu akun toko, lalu gunakan email dan kata sandi yang sama pada semua HP. Jangan bagikan kata sandinya.',
+            { title: 'Buat Akun Toko', confirmText: 'Buat Akun', icon: '☁' }
+        );
+        if (!confirmed) return;
+        if (!window.FirebaseSync) throw new Error('Modul Firebase belum siap. Pastikan internet aktif lalu buka ulang aplikasi.');
+        await window.FirebaseSync.signUp(credentials.email, credentials.password);
+        document.getElementById('firebase-password').value = '';
+        showAppToast('Akun toko dibuat. Data lokal sedang diunggah.', 'success', 4200);
+    } catch (error) {
+        showAppToast(error.message || 'Akun Firebase gagal dibuat.', 'error', 4800);
+    }
+}
+
+async function firebaseSignOut() {
+    try {
+        await window.FirebaseSync?.signOut();
+        showAppToast('Akun Firebase dikeluarkan. Data lokal di HP tetap tersimpan.', 'success');
+    } catch (error) {
+        showAppToast(error.message || 'Gagal keluar dari Firebase.', 'error');
+    }
+}
+
+async function firebaseSyncNow() {
+    try {
+        if (!window.FirebaseSync) throw new Error('Modul Firebase belum siap.');
+        await window.FirebaseSync.syncNow();
+        showAppToast('Pemeriksaan sinkronisasi selesai.', 'success');
+    } catch (error) {
+        showAppToast(error.message || 'Sinkronisasi belum dapat dijalankan.', 'error');
+    }
+}
+
+async function removeFirebaseConfiguration() {
+    const confirmed = await showAppConfirm(
+        'Koneksi Firebase akan dilepas dari HP ini. Data lokal tidak dihapus.',
+        { title: 'Lepas Firebase', confirmText: 'Lepas Koneksi', icon: '☁' }
+    );
+    if (!confirmed) return;
+    try {
+        await window.FirebaseSync?.signOut();
+    } catch (error) {
+        console.debug('Sesi Firebase tidak dapat ditutup sebelum konfigurasi dilepas.', error);
+    }
+    const settings = DB.getSettings();
+    settings.firebaseConfig = null;
+    DB.saveSettings(settings);
+    window.location.reload();
 }
 
 function selectReceiptTemplate(templateName) {
@@ -1287,13 +1492,14 @@ function renderProducts() {
                     <p class="${stockClass}">Stok: <strong>${product.stok}</strong> ${escapeHtml(product.satuan)} · ${formatRupiah(product.price)}</p>
                     <p class="barcode-caption">BC: ${escapeHtml(product.barcode)}</p>
                 </div>
-                ${isAdmin ? `
-                    <div class="item-actions">
+                <div class="item-actions">
+                    <button data-label-index="${index}" class="btn-outline btn-small">🏷 Label</button>
+                    ${isAdmin ? `
                         <button data-restock-index="${index}" class="btn-warning btn-small">+ Stok</button>
                         <button data-edit-index="${index}" class="btn-primary btn-small">Edit</button>
                         <button data-delete-index="${index}" class="btn-danger btn-small">Hapus</button>
-                    </div>
-                ` : ''}
+                    ` : ''}
+                </div>
             </li>
         `;
     }).join('');
@@ -1306,6 +1512,9 @@ function renderProducts() {
     });
     productList.querySelectorAll('[data-delete-index]').forEach(button => {
         button.addEventListener('click', () => hapusBarang(filtered[Number(button.dataset.deleteIndex)].barcode));
+    });
+    productList.querySelectorAll('[data-label-index]').forEach(button => {
+        button.addEventListener('click', () => openBarcodeLabel(filtered[Number(button.dataset.labelIndex)].barcode));
     });
 }
 
@@ -1341,6 +1550,157 @@ async function hapusBarang(barcode) {
         renderCart();
         updateDashboardStats();
         showAppToast('Barang berhasil dihapus.', 'success');
+    }
+}
+
+// ================= LABEL BARCODE =================
+function closeBarcodeLabel() {
+    document.getElementById('barcode-label-modal').style.display = 'none';
+    activeLabelBarcode = null;
+}
+
+function drawWrappedCanvasText(context, text, x, y, maxWidth, lineHeight, maxLines = 2) {
+    const words = String(text || '').split(/\s+/).filter(Boolean);
+    const lines = [];
+    let line = '';
+    words.forEach(word => {
+        const candidate = line ? `${line} ${word}` : word;
+        if (context.measureText(candidate).width <= maxWidth) line = candidate;
+        else {
+            if (line) lines.push(line);
+            line = word;
+        }
+    });
+    if (line) lines.push(line);
+    const visible = lines.slice(0, maxLines);
+    if (lines.length > maxLines && visible.length) {
+        let last = visible[visible.length - 1];
+        while (last && context.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
+        visible[visible.length - 1] = `${last}…`;
+    }
+    visible.forEach((entry, index) => context.fillText(entry, x, y + index * lineHeight));
+    return y + visible.length * lineHeight;
+}
+
+function renderBarcodeLabelCanvas(product, canvas) {
+    const showPrice = document.getElementById('label-show-price')?.checked !== false;
+    const showName = document.getElementById('label-show-name')?.checked !== false;
+    canvas.width = 384;
+    canvas.height = 230;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#111111';
+    context.textAlign = 'center';
+    let top = 23;
+
+    if (showName) {
+        context.font = '700 20px Arial, sans-serif';
+        top = drawWrappedCanvasText(context, product.name, canvas.width / 2, top, 350, 23, 2) + 2;
+    }
+    if (showPrice) {
+        context.font = '800 24px Arial, sans-serif';
+        context.fillText(formatRupiah(product.price), canvas.width / 2, top + 20);
+        top += 30;
+    }
+
+    const barcodeCanvas = document.createElement('canvas');
+    if (typeof JsBarcode !== 'function') throw new Error('Pembuat barcode belum tersedia. Tutup lalu buka kembali aplikasi saat internet aktif.');
+    JsBarcode(barcodeCanvas, String(product.barcode), {
+        format: 'CODE128',
+        width: 2,
+        height: 76,
+        displayValue: true,
+        font: 'Arial',
+        fontSize: 18,
+        margin: 2,
+        background: '#ffffff',
+        lineColor: '#000000'
+    });
+    const maxBarcodeWidth = 360;
+    const maxBarcodeHeight = 120;
+    const scale = Math.min(maxBarcodeWidth / barcodeCanvas.width, maxBarcodeHeight / barcodeCanvas.height, 1);
+    const barcodeWidth = Math.round(barcodeCanvas.width * scale);
+    const barcodeHeight = Math.round(barcodeCanvas.height * scale);
+    const barcodeY = Math.min(canvas.height - barcodeHeight - 15, Math.max(top + 2, 76));
+    context.imageSmoothingEnabled = false;
+    context.drawImage(barcodeCanvas, (canvas.width - barcodeWidth) / 2, barcodeY, barcodeWidth, barcodeHeight);
+    context.strokeStyle = '#111111';
+    context.lineWidth = 2;
+    context.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+    return canvas;
+}
+
+function renderBarcodeLabelPreview() {
+    const product = DB.getProducts().find(item => item.barcode === activeLabelBarcode);
+    const canvas = document.getElementById('barcode-label-canvas');
+    if (!product || !canvas) return;
+    try {
+        renderBarcodeLabelCanvas(product, canvas);
+        document.getElementById('barcode-label-error').textContent = '';
+    } catch (error) {
+        document.getElementById('barcode-label-error').textContent = error.message;
+    }
+}
+
+function openBarcodeLabel(barcode) {
+    const product = DB.getProducts().find(item => item.barcode === barcode);
+    if (!product) return;
+    activeLabelBarcode = product.barcode;
+    document.getElementById('barcode-label-product').textContent = product.name;
+    document.getElementById('barcode-label-code').textContent = product.barcode;
+    document.getElementById('label-copies').value = '1';
+    document.getElementById('label-show-name').checked = true;
+    document.getElementById('label-show-price').checked = true;
+    document.getElementById('barcode-label-modal').style.display = 'flex';
+    renderBarcodeLabelPreview();
+}
+
+function createRepeatedLabelImage(sourceCanvas, copies) {
+    const gap = 10;
+    const composite = document.createElement('canvas');
+    composite.width = sourceCanvas.width;
+    composite.height = (sourceCanvas.height + gap) * copies;
+    const context = composite.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, composite.width, composite.height);
+    for (let index = 0; index < copies; index += 1) {
+        context.drawImage(sourceCanvas, 0, index * (sourceCanvas.height + gap));
+    }
+    return composite.toDataURL('image/png');
+}
+
+async function printBarcodeLabel() {
+    const product = DB.getProducts().find(item => item.barcode === activeLabelBarcode);
+    if (!product) {
+        showAppToast('Barang untuk label tidak ditemukan.', 'error');
+        return;
+    }
+    const copies = Math.min(10, Math.max(1, Number.parseInt(document.getElementById('label-copies').value, 10) || 1));
+    const button = document.getElementById('barcode-label-print-button');
+    button.disabled = true;
+    try {
+        const canvas = renderBarcodeLabelCanvas(product, document.getElementById('barcode-label-canvas'));
+        const labelImage = canvas.toDataURL('image/png');
+        const settings = DB.getSettings();
+
+        if (isNativePrinterAvailable() || settings.printMode === 'bluetooth') {
+            for (let index = 0; index < copies; index += 1) {
+                const printed = await connectAndPrintBluetooth('', labelImage, true);
+                if (!printed) throw new Error(`Label ke-${index + 1} belum berhasil dicetak.`);
+            }
+        } else {
+            if (settings.printMode === 'rawbt') {
+                showAppToast('Label bergambar dibuka melalui dialog cetak. Pilih Bluetooth Langsung untuk RPP02N.', 'info', 4200);
+            }
+            printViaBrowser('', createRepeatedLabelImage(canvas, copies));
+        }
+        showAppToast(`${copies} label ${product.name} disiapkan untuk dicetak.`, 'success');
+    } catch (error) {
+        console.error('Cetak label gagal.', error);
+        showAppToast(error.message || 'Label barcode gagal dicetak.', 'error', 4800);
+    } finally {
+        button.disabled = false;
     }
 }
 
@@ -1438,6 +1798,23 @@ function renderCart() {
 }
 
 // ================= PEMBAYARAN & CETAK =================
+function populateCustomerSuggestions() {
+    const datalist = document.getElementById('customer-suggestions');
+    if (!datalist) return;
+    datalist.innerHTML = DB.getCustomers()
+        .sort((first, second) => first.name.localeCompare(second.name, 'id'))
+        .map(customer => `<option value="${escapeHtml(customer.name)}" data-phone="${escapeHtml(customer.phone)}">${escapeHtml(customer.phone)}</option>`)
+        .join('');
+}
+
+function fillCheckoutCustomerPhone() {
+    const name = document.getElementById('checkout-customer-name').value.trim();
+    const customer = DB.getCustomers().find(item => item.name.toLocaleLowerCase('id') === name.toLocaleLowerCase('id'));
+    if (customer && !document.getElementById('checkout-customer-phone').value.trim()) {
+        document.getElementById('checkout-customer-phone').value = customer.phone || '';
+    }
+}
+
 function updateQrisPaymentUI() {
     const settings = DB.getSettings();
     const image = document.getElementById('qris-payment-image');
@@ -1477,6 +1854,11 @@ function openPaymentModal() {
     document.getElementById('qris-payment-merchant').textContent = settings.qrisMerchantName || 'AL - STORE';
     document.getElementById('input-tunai').value = '';
     document.getElementById('modal-kembalian').textContent = formatRupiah(0);
+    document.getElementById('checkout-customer-name').value = '';
+    document.getElementById('checkout-customer-phone').value = '';
+    document.getElementById('credit-due-date').value = '';
+    document.getElementById('credit-note').value = '';
+    populateCustomerSuggestions();
     const initialMethod = settings.lastPaymentMethod === 'qris' ? 'qris' : 'cash';
     selectPaymentMethod(initialMethod, false);
     document.getElementById('payment-modal').style.display = 'flex';
@@ -1501,23 +1883,30 @@ function hitungKembalian() {
 }
 
 function selectPaymentMethod(method, persist = true) {
-    currentPaymentMethod = method === 'qris' ? 'qris' : 'cash';
+    currentPaymentMethod = ['qris', 'credit'].includes(method) ? method : 'cash';
     const isQris = currentPaymentMethod === 'qris';
-    document.getElementById('cash-payment-panel').style.display = isQris ? 'none' : 'block';
+    const isCredit = currentPaymentMethod === 'credit';
+    document.getElementById('cash-payment-panel').style.display = (!isQris && !isCredit) ? 'block' : 'none';
     document.getElementById('qris-payment-panel').style.display = isQris ? 'block' : 'none';
-    document.getElementById('payment-method-cash').classList.toggle('is-active', !isQris);
+    document.getElementById('credit-payment-panel').style.display = isCredit ? 'block' : 'none';
+    document.getElementById('payment-method-cash').classList.toggle('is-active', !isQris && !isCredit);
     document.getElementById('payment-method-qris').classList.toggle('is-active', isQris);
-    document.getElementById('payment-method-cash').setAttribute('aria-pressed', String(!isQris));
+    document.getElementById('payment-method-credit').classList.toggle('is-active', isCredit);
+    document.getElementById('payment-method-cash').setAttribute('aria-pressed', String(!isQris && !isCredit));
     document.getElementById('payment-method-qris').setAttribute('aria-pressed', String(isQris));
-    document.getElementById('payment-confirm-button').textContent = isQris ? 'Proses QRIS' : 'Proses Tunai';
+    document.getElementById('payment-method-credit').setAttribute('aria-pressed', String(isCredit));
+    document.getElementById('payment-confirm-button').textContent = isQris
+        ? 'Proses QRIS'
+        : (isCredit ? 'Simpan Bon & Cetak' : 'Proses Tunai');
 
     if (persist) {
         const settings = DB.getSettings();
-        settings.lastPaymentMethod = currentPaymentMethod;
+        settings.lastPaymentMethod = currentPaymentMethod === 'credit' ? 'cash' : currentPaymentMethod;
         DB.saveSettings(settings);
     }
     if (isQris) updateQrisPaymentUI();
-    if (!isQris) setTimeout(() => document.getElementById('input-tunai')?.focus(), 80);
+    if (!isQris && !isCredit) setTimeout(() => document.getElementById('input-tunai')?.focus(), 80);
+    if (isCredit) setTimeout(() => document.getElementById('checkout-customer-name')?.focus(), 80);
 }
 
 function receiptMoney(value) {
@@ -1574,14 +1963,34 @@ function receiptStoreHeader(settings, width = 32, compact = false) {
 }
 
 function receiptPaymentLines(transaction, width = 32) {
-    const isQris = String(transaction.paymentMethod || 'cash').toLowerCase() === 'qris';
+    const method = String(transaction.paymentMethod || 'cash').toLowerCase();
+    const customerLines = transaction.customerName
+        ? wrapReceiptText(`PELANGGAN: ${transaction.customerName}`, width)
+        : [];
+    if (method === 'credit') {
+        const remaining = Number.isFinite(Number(transaction.debtRemainingAmount))
+            ? Number(transaction.debtRemainingAmount)
+            : Number(transaction.total || 0);
+        const lines = [
+            ...customerLines,
+            receiptColumns('METODE BAYAR', 'BON', width),
+            receiptColumns('TOTAL HUTANG', `Rp ${receiptMoney(transaction.total)}`, width),
+            receiptColumns('SISA HUTANG', `Rp ${receiptMoney(remaining)}`, width)
+        ];
+        if (transaction.creditDueDate) lines.push(receiptColumns('JATUH TEMPO', transaction.creditDueDate, width));
+        if (transaction.creditNote) lines.push(...wrapReceiptText(`CATATAN: ${transaction.creditNote}`, width));
+        return lines;
+    }
+    const isQris = method === 'qris';
     if (isQris) {
         return [
+            ...customerLines,
             receiptColumns('METODE BAYAR', 'QRIS', width),
             receiptColumns('DIBAYAR', `Rp ${receiptMoney(transaction.total)}`, width)
         ];
     }
     return [
+        ...customerLines,
         receiptColumns('METODE BAYAR', 'TUNAI', width),
         receiptColumns('TUNAI', `Rp ${receiptMoney(transaction.tunai)}`, width),
         receiptColumns('KEMBALI', `Rp ${receiptMoney(transaction.kembali)}`, width)
@@ -1686,8 +2095,16 @@ function createTransaction(paymentMethod, paymentData = {}) {
     const calculatedTotal = sourceItems.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
     const total = Number(paymentData.total) || calculatedTotal;
     const isQris = paymentMethod === 'qris';
-    const cash = isQris ? total : Number(document.getElementById('input-tunai').value) || 0;
-    if (!isQris && cash < total) {
+    const isCredit = paymentMethod === 'credit';
+    const customerName = String(paymentData.customerName ?? document.getElementById('checkout-customer-name')?.value ?? '').trim();
+    const customerPhone = String(paymentData.customerPhone ?? document.getElementById('checkout-customer-phone')?.value ?? '').trim();
+    if (isCredit && !customerName) {
+        showAppToast('Nama pelanggan wajib diisi untuk transaksi bon.', 'warning');
+        document.getElementById('checkout-customer-name')?.focus();
+        return null;
+    }
+    const cash = (isQris || isCredit) ? (isQris ? total : 0) : Number(document.getElementById('input-tunai').value) || 0;
+    if (!isQris && !isCredit && cash < total) {
         showAppToast('Uang tunai pembeli masih kurang.', 'warning');
         return null;
     }
@@ -1696,16 +2113,22 @@ function createTransaction(paymentMethod, paymentData = {}) {
     const settings = DB.getSettings();
     return {
         id: now,
+        syncId: DB.newId('trx'),
         createdAt: now,
-        paidAt: now,
+        updatedAt: now,
+        paidAt: isCredit ? 0 : now,
         waktu: new Date(now).toLocaleString('id-ID'),
         items: sourceItems.map(item => ({ ...item })),
         total,
         tunai: cash,
-        kembali: isQris ? 0 : cash - total,
-        paymentMethod: isQris ? 'qris' : 'cash',
-        paymentStatus: String(paymentData.paymentStatus || 'paid'),
-        paymentMerchant: isQris ? (settings.qrisMerchantName || 'AL - STORE') : ''
+        kembali: (isQris || isCredit) ? 0 : cash - total,
+        paymentMethod: isCredit ? 'credit' : (isQris ? 'qris' : 'cash'),
+        paymentStatus: String(paymentData.paymentStatus || (isCredit ? 'unpaid' : 'paid')),
+        paymentMerchant: isQris ? (settings.qrisMerchantName || 'AL - STORE') : '',
+        customerName,
+        customerPhone,
+        creditDueDate: isCredit ? String(document.getElementById('credit-due-date')?.value || '') : '',
+        creditNote: isCredit ? String(document.getElementById('credit-note')?.value || '').trim() : ''
     };
 }
 
@@ -1729,7 +2152,15 @@ function applyTransactionStock(transaction, allowStockShortage = false) {
 
 async function finalizePaidTransaction(transaction, forcePrint = false, allowStockShortage = false) {
     const products = applyTransactionStock(transaction, allowStockShortage);
-    if (!products || !DB.commitSale(products, transaction)) return false;
+    const customer = transaction.customerName ? {
+        name: transaction.customerName,
+        phone: transaction.customerPhone
+    } : null;
+    const debt = transaction.paymentMethod === 'credit' ? {
+        dueDate: transaction.creditDueDate,
+        note: transaction.creditNote
+    } : null;
+    if (!products || !DB.commitSale(products, transaction, customer, debt)) return false;
 
     const receiptText = buildReceipt(transaction);
     document.getElementById('print-text-preview').value = receiptText;
@@ -1737,12 +2168,18 @@ async function finalizePaidTransaction(transaction, forcePrint = false, allowSto
     renderCart();
     closePaymentModal();
     updateDashboardStats();
+    if (currentPage === 'page-piutang') renderDebts();
 
     const settings = DB.getSettings();
     if (forcePrint || settings.autoPrint) {
         const printed = await printReceipt(receiptText);
         if (!printed) document.getElementById('preview-modal').style.display = 'flex';
-        else showAppToast('Pembayaran tersimpan dan struk berhasil dikirim ke printer.', 'success', 4200);
+        else showAppToast(
+            transaction.paymentMethod === 'credit'
+                ? 'Bon tersimpan dan catatan berhasil dikirim ke printer.'
+                : 'Pembayaran tersimpan dan struk berhasil dikirim ke printer.',
+            'success', 4200
+        );
     } else {
         document.getElementById('preview-modal').style.display = 'flex';
     }
@@ -1760,6 +2197,18 @@ async function processSelectedPayment() {
             const confirmed = await showAppConfirm(
                 'Pastikan dana QRIS sudah benar-benar masuk. Setelah dikonfirmasi, stok akan berkurang dan struk langsung dicetak.',
                 { title: 'Konfirmasi Dana QRIS', confirmText: 'Dana Sudah Masuk', icon: '✓' }
+            );
+            if (!confirmed) return;
+        } else if (currentPaymentMethod === 'credit') {
+            const customerName = document.getElementById('checkout-customer-name').value.trim();
+            if (!customerName) {
+                showAppToast('Nama pelanggan wajib diisi untuk bon.', 'warning');
+                document.getElementById('checkout-customer-name').focus();
+                return;
+            }
+            const confirmed = await showAppConfirm(
+                `Simpan seluruh belanja sebagai hutang atas nama ${customerName}? Stok akan langsung berkurang.`,
+                { title: 'Konfirmasi Bon', confirmText: 'Simpan Bon', icon: '🧾' }
             );
             if (!confirmed) return;
         }
@@ -1887,6 +2336,233 @@ async function testPrint() {
     await printReceipt(testReceipt);
 }
 
+// ================= PELANGGAN & PIUTANG =================
+function formatShortDate(value) {
+    if (!value) return '-';
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(value))
+        ? new Date(`${value}T00:00:00`)
+        : new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function debtStatusLabel(status) {
+    if (status === 'paid') return 'Lunas';
+    if (status === 'partial') return 'Dicicil';
+    return 'Belum Lunas';
+}
+
+function renderDebts() {
+    const list = document.getElementById('debt-list');
+    if (!list) return;
+    const debts = DB.getDebts();
+    const search = document.getElementById('debt-search').value.trim().toLocaleLowerCase('id');
+    const filter = document.getElementById('debt-status-filter').value;
+    const todayKey = getLocalDateKey();
+    const outstanding = debts.filter(debt => debt.remainingAmount > 0);
+    const outstandingTotal = outstanding.reduce((sum, debt) => sum + debt.remainingAmount, 0);
+    const customerCount = new Set(outstanding.map(debt => debt.customerId || debt.customerName)).size;
+    const collectedToday = debts.reduce((sum, debt) => sum + debt.payments
+        .filter(payment => getLocalDateKey(payment.createdAt) === todayKey)
+        .reduce((paymentSum, payment) => paymentSum + payment.amount, 0), 0);
+
+    document.getElementById('debt-total-outstanding').textContent = formatRupiah(outstandingTotal);
+    document.getElementById('debt-customer-count').textContent = customerCount;
+    document.getElementById('debt-collected-today').textContent = formatRupiah(collectedToday);
+
+    const filtered = debts.filter(debt => {
+        const matchesSearch = !search || [debt.customerName, debt.customerPhone, debt.note, debt.transactionId]
+            .some(value => String(value || '').toLocaleLowerCase('id').includes(search));
+        const matchesStatus = !filter || (filter === 'open' ? debt.remainingAmount > 0 : debt.status === filter);
+        return matchesSearch && matchesStatus;
+    });
+    document.getElementById('debt-count-badge').textContent = filtered.length;
+
+    if (!filtered.length) {
+        list.innerHTML = '<li class="empty-state">Belum ada catatan piutang yang cocok.</li>';
+        return;
+    }
+
+    list.innerHTML = filtered.map((debt, index) => {
+        const isOverdue = debt.remainingAmount > 0 && debt.dueDate && debt.dueDate < todayKey;
+        const payments = debt.payments.length
+            ? debt.payments.map(payment => `
+                <div class="debt-payment-row">
+                    <span>${escapeHtml(payment.waktu)} · ${payment.method === 'qris' ? 'QRIS' : 'Tunai'}</span>
+                    <strong>${formatRupiah(payment.amount)}</strong>
+                    ${payment.note ? `<small>${escapeHtml(payment.note)}</small>` : ''}
+                </div>
+            `).join('')
+            : '<p class="helper-text">Belum ada pembayaran cicilan.</p>';
+        return `
+            <li class="debt-card-item">
+                <div class="debt-card-head">
+                    <div>
+                        <span class="category-badge debt-status-${escapeHtml(debt.status)}">${debtStatusLabel(debt.status)}</span>
+                        ${isOverdue ? '<span class="category-badge debt-overdue-badge">Terlambat</span>' : ''}
+                        <h4>${escapeHtml(debt.customerName || 'Tanpa nama')}</h4>
+                        <p>${escapeHtml(debt.customerPhone || 'Nomor HP tidak dicatat')} · Ref ${escapeHtml(debt.transactionId || '-')}</p>
+                    </div>
+                    <strong class="debt-remaining">${formatRupiah(debt.remainingAmount)}</strong>
+                </div>
+                <div class="debt-amount-grid">
+                    <div><span>Hutang awal</span><strong>${formatRupiah(debt.amount)}</strong></div>
+                    <div><span>Sudah dibayar</span><strong>${formatRupiah(debt.paidAmount)}</strong></div>
+                    <div><span>Dibuat</span><strong>${formatShortDate(debt.createdAt)}</strong></div>
+                    <div><span>Jatuh tempo</span><strong>${formatShortDate(debt.dueDate)}</strong></div>
+                </div>
+                ${debt.note ? `<p class="debt-note">Catatan: ${escapeHtml(debt.note)}</p>` : ''}
+                <details class="debt-details">
+                    <summary>Riwayat pembayaran (${debt.payments.length})</summary>
+                    <div class="debt-payment-history">${payments}</div>
+                </details>
+                <div class="debt-actions">
+                    ${debt.remainingAmount > 0 ? `<button data-debt-pay-index="${index}" class="btn-primary">+ Catat Pembayaran</button>` : ''}
+                    <button data-debt-print-index="${index}" class="btn-outline">🖨️ Cetak Catatan</button>
+                </div>
+            </li>
+        `;
+    }).join('');
+
+    list.querySelectorAll('[data-debt-pay-index]').forEach(button => {
+        button.addEventListener('click', () => openDebtPaymentModal(filtered[Number(button.dataset.debtPayIndex)].id));
+    });
+    list.querySelectorAll('[data-debt-print-index]').forEach(button => {
+        button.addEventListener('click', () => printDebtStatement(filtered[Number(button.dataset.debtPrintIndex)].id));
+    });
+}
+
+function clearDebtFilters() {
+    document.getElementById('debt-search').value = '';
+    document.getElementById('debt-status-filter').value = 'open';
+    renderDebts();
+}
+
+function openDebtPaymentModal(debtId) {
+    const debt = DB.getDebts().find(item => item.id === String(debtId));
+    if (!debt || debt.remainingAmount <= 0) return;
+    activeDebtId = debt.id;
+    document.getElementById('debt-payment-customer').textContent = debt.customerName;
+    document.getElementById('debt-payment-remaining').textContent = formatRupiah(debt.remainingAmount);
+    document.getElementById('debt-payment-amount').value = debt.remainingAmount;
+    document.getElementById('debt-payment-method').value = 'cash';
+    document.getElementById('debt-payment-note').value = '';
+    document.getElementById('debt-payment-modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('debt-payment-amount').focus(), 80);
+}
+
+function closeDebtPaymentModal() {
+    document.getElementById('debt-payment-modal').style.display = 'none';
+    activeDebtId = null;
+}
+
+function buildDebtStatement(debt, paymentOnly = false) {
+    const settings = DB.getSettings();
+    const width = 32;
+    const line = '-'.repeat(width);
+    const latestPayment = debt.payments[debt.payments.length - 1];
+    const lines = [
+        ...receiptStoreHeader(settings, width),
+        '='.repeat(width),
+        ...centerReceiptText(paymentOnly ? 'BUKTI BAYAR PIUTANG' : 'CATATAN PIUTANG', width),
+        line,
+        ...wrapReceiptText(`PELANGGAN: ${debt.customerName || '-'}`, width)
+    ];
+    if (debt.customerPhone) lines.push(...wrapReceiptText(`HP: ${debt.customerPhone}`, width));
+    lines.push(receiptColumns('NO. TRANSAKSI', debt.transactionId || '-', width));
+    lines.push(receiptColumns('TANGGAL BON', formatShortDate(debt.createdAt), width));
+    if (debt.dueDate) lines.push(receiptColumns('JATUH TEMPO', formatShortDate(debt.dueDate), width));
+    lines.push(line);
+    lines.push(receiptColumns('HUTANG AWAL', `Rp ${receiptMoney(debt.amount)}`, width));
+    if (paymentOnly && latestPayment) {
+        lines.push(receiptColumns('BAYAR SEKARANG', `Rp ${receiptMoney(latestPayment.amount)}`, width));
+        lines.push(receiptColumns('CARA BAYAR', latestPayment.method === 'qris' ? 'QRIS' : 'TUNAI', width));
+    }
+    lines.push(receiptColumns('TOTAL TERBAYAR', `Rp ${receiptMoney(debt.paidAmount)}`, width));
+    lines.push(receiptColumns('SISA HUTANG', `Rp ${receiptMoney(debt.remainingAmount)}`, width));
+    lines.push(receiptColumns('STATUS', debtStatusLabel(debt.status).toUpperCase(), width));
+    if (debt.note) lines.push(...wrapReceiptText(`CATATAN: ${debt.note}`, width));
+    if (!paymentOnly && debt.payments.length) {
+        lines.push(line);
+        lines.push(...centerReceiptText('RIWAYAT BAYAR', width));
+        debt.payments.forEach(payment => {
+            lines.push(receiptColumns(formatShortDate(payment.createdAt), `Rp ${receiptMoney(payment.amount)}`, width));
+        });
+    }
+    lines.push(line);
+    lines.push(...centerReceiptText(settings.footerText || 'Terima Kasih', width));
+    return `${lines.join('\n')}\n\n`;
+}
+
+async function submitDebtPayment() {
+    const debt = DB.getDebts().find(item => item.id === activeDebtId);
+    if (!debt) return;
+    const amount = Number(document.getElementById('debt-payment-amount').value) || 0;
+    const method = document.getElementById('debt-payment-method').value;
+    const note = document.getElementById('debt-payment-note').value.trim();
+    if (amount <= 0 || amount > debt.remainingAmount) {
+        showAppToast(`Nominal pembayaran harus antara Rp 1 dan ${formatRupiah(debt.remainingAmount)}.`, 'warning');
+        return;
+    }
+    const confirmed = await showAppConfirm(
+        `Catat pembayaran ${formatRupiah(amount)} dari ${debt.customerName}?`,
+        { title: 'Pembayaran Piutang', confirmText: 'Simpan Pembayaran', icon: '✓' }
+    );
+    if (!confirmed) return;
+
+    const updated = DB.recordDebtPayment(debt.id, amount, method, note);
+    if (!updated) {
+        showAppToast('Pembayaran belum berhasil disimpan.', 'error');
+        return;
+    }
+    closeDebtPaymentModal();
+    renderDebts();
+    updateDashboardStats();
+    const receipt = buildDebtStatement(updated, true);
+    document.getElementById('print-text-preview').value = receipt;
+    if (DB.getSettings().autoPrint) {
+        const printed = await printReceipt(receipt);
+        if (!printed) document.getElementById('preview-modal').style.display = 'flex';
+    } else {
+        document.getElementById('preview-modal').style.display = 'flex';
+    }
+    showAppToast(updated.status === 'paid' ? 'Piutang lunas dan pembayaran tercatat.' : 'Cicilan berhasil dicatat.', 'success');
+}
+
+function printDebtStatement(debtId) {
+    const debt = DB.getDebts().find(item => item.id === String(debtId));
+    if (!debt) return;
+    document.getElementById('print-text-preview').value = buildDebtStatement(debt, false);
+    document.getElementById('preview-modal').style.display = 'flex';
+}
+
+function exportDebtsCsv() {
+    const debts = DB.getDebts();
+    if (!debts.length) {
+        showAppToast('Belum ada data piutang untuk diekspor.', 'warning');
+        return;
+    }
+    const rows = [
+        ['ID Piutang', 'No Transaksi', 'Pelanggan', 'Telepon', 'Tanggal', 'Jatuh Tempo', 'Hutang Awal', 'Terbayar', 'Sisa', 'Status', 'Catatan', 'Riwayat Pembayaran'],
+        ...debts.map(debt => [
+            debt.id,
+            debt.transactionId,
+            debt.customerName,
+            debt.customerPhone,
+            new Date(debt.createdAt).toLocaleString('id-ID'),
+            debt.dueDate,
+            debt.amount,
+            debt.paidAmount,
+            debt.remainingAmount,
+            debtStatusLabel(debt.status),
+            debt.note,
+            debt.payments.map(payment => `${payment.waktu}: ${payment.amount} (${payment.method})`).join('; ')
+        ])
+    ];
+    const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\n');
+    downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `piutang-warungscan-${getLocalDateKey()}.csv`);
+}
+
 // ================= RIWAYAT & LAPORAN =================
 function calculateTransactionProfit(transaction) {
     return transaction.items.reduce((sum, item) => {
@@ -1929,13 +2605,20 @@ function renderHistory() {
         const itemNames = transaction.items
             .map(item => `${escapeHtml(item.name)} (${item.qty})`)
             .join(', ');
-        const paymentLabel = transaction.paymentMethod === 'qris' ? 'QRIS' : 'TUNAI';
+        const paymentLabel = transaction.paymentMethod === 'qris'
+            ? 'QRIS'
+            : (transaction.paymentMethod === 'credit' ? 'BON' : 'TUNAI');
+        const creditStatus = transaction.paymentMethod === 'credit'
+            ? `<span class="category-badge debt-status-${escapeHtml(transaction.paymentStatus)}">${transaction.paymentStatus === 'paid' ? 'LUNAS' : (transaction.paymentStatus === 'partial' ? 'DICICIL' : 'BELUM LUNAS')}</span>`
+            : '';
         return `
             <li>
                 <div class="item-info">
                     <h4>No. Ref: ${escapeHtml(transaction.id)}</h4>
                     <p class="text-success">${escapeHtml(transaction.waktu)}</p>
                     <span class="category-badge">${paymentLabel}</span>
+                    ${creditStatus}
+                    ${transaction.customerName ? `<p>👤 ${escapeHtml(transaction.customerName)}${transaction.customerPhone ? ` · ${escapeHtml(transaction.customerPhone)}` : ''}</p>` : ''}
                     <p>${itemNames}</p>
                     <button data-reprint-index="${index}" class="btn-outline btn-small history-print">🖨️ Cetak Ulang</button>
                 </div>
@@ -1945,7 +2628,9 @@ function renderHistory() {
     }).join('');
 
     historyList.querySelectorAll('[data-reprint-index]').forEach(button => {
-        button.addEventListener('click', () => cetakUlangStruk(filtered[Number(button.dataset.reprintIndex)].id));
+        button.addEventListener('click', () => cetakUlangStruk(
+            filtered[Number(button.dataset.reprintIndex)].syncId || filtered[Number(button.dataset.reprintIndex)].id
+        ));
     });
 }
 
@@ -1955,7 +2640,9 @@ function clearHistoryFilter() {
 }
 
 function cetakUlangStruk(transactionId) {
-    const transaction = DB.getHistory().find(item => item.id === Number(transactionId));
+    const transaction = DB.getHistory().find(item =>
+        item.syncId === String(transactionId) || item.id === Number(transactionId)
+    );
     if (!transaction) {
         showAppToast('Transaksi tidak ditemukan.', 'error');
         return;
@@ -1965,7 +2652,7 @@ function cetakUlangStruk(transactionId) {
 }
 
 async function hapusSemuaRiwayat() {
-    const confirmed = await showAppConfirm('Semua riwayat transaksi akan dihapus. Data barang tidak ikut terhapus.', {
+    const confirmed = await showAppConfirm('Semua riwayat transaksi akan dihapus. Data barang dan catatan piutang tetap disimpan.', {
         title: 'Kosongkan Riwayat', confirmText: 'Hapus Semua', icon: '🗑'
     });
     if (!confirmed) return;
@@ -1988,11 +2675,14 @@ function exportHistoryCsv() {
     }
 
     const rows = [
-        ['ID', 'Tanggal', 'Metode Pembayaran', 'Barang', 'Total', 'Tunai', 'Kembali', 'Estimasi Laba'],
+        ['ID', 'Tanggal', 'Pelanggan', 'Telepon', 'Metode Pembayaran', 'Status', 'Barang', 'Total', 'Tunai', 'Kembali', 'Estimasi Laba'],
         ...histories.map(transaction => [
             transaction.id,
             transaction.waktu,
-            transaction.paymentMethod === 'qris' ? 'QRIS' : 'Tunai',
+            transaction.customerName || '',
+            transaction.customerPhone || '',
+            transaction.paymentMethod === 'qris' ? 'QRIS' : (transaction.paymentMethod === 'credit' ? 'Bon' : 'Tunai'),
+            transaction.paymentStatus || 'paid',
             transaction.items.map(item => `${item.name} x${item.qty}`).join('; '),
             transaction.total,
             transaction.tunai,
@@ -2209,6 +2899,7 @@ async function importBackup(inputElement) {
         renderCart();
         renderProducts();
         renderHistory();
+        renderDebts();
         updateDashboardStats();
         loadSettingsUI();
         showAppToast('Backup lengkap berhasil dipulihkan.', 'success');
@@ -2251,6 +2942,19 @@ document.addEventListener('visibilitychange', () => {
         closeProductCamera();
         closeProductBarcodeScanner();
     }
+});
+
+window.addEventListener('warungscan:remote-updated', event => {
+    const dataset = event.detail?.dataset;
+    if (dataset === 'products') {
+        renderProducts();
+        renderCart();
+    }
+    if (dataset === 'history') renderHistory();
+    if (dataset === 'customers') populateCustomerSuggestions();
+    if (dataset === 'debts') renderDebts();
+    if (dataset === 'settings') loadSettingsUI();
+    updateDashboardStats();
 });
 window.addEventListener('pagehide', () => {
     stopScanner();

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f766e">
+    <title>Panduan Firebase Warung Scan</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #f8fafc; color: #0f172a; font-family: Arial, sans-serif; line-height: 1.6; }
+        header { position: sticky; top: 0; padding: 18px 20px; background: #0f766e; color: white; box-shadow: 0 2px 12px rgba(0,0,0,.16); }
+        header h1 { margin: 0; font-size: 20px; }
+        header p { margin: 3px 0 0; font-size: 12px; opacity: .85; }
+        main { max-width: 720px; margin: 0 auto; padding: 18px 14px 40px; }
+        .notice, .step { margin-bottom: 14px; padding: 16px; border: 1px solid #e2e8f0; border-radius: 16px; background: white; box-shadow: 0 3px 12px rgba(15,23,42,.05); }
+        .notice { background: #ecfdf5; border-color: #a7f3d0; }
+        .warning { background: #fff7ed; border-color: #fed7aa; }
+        .step h2 { margin: 0 0 8px; color: #0f766e; font-size: 17px; }
+        .step p, .step li, .notice { font-size: 14px; }
+        ol, ul { padding-left: 22px; }
+        a { color: #0f766e; font-weight: 700; }
+        code { padding: 2px 5px; border-radius: 5px; background: #e2e8f0; font-family: monospace; }
+        pre { overflow-x: auto; padding: 13px; border-radius: 10px; background: #0f172a; color: #e2e8f0; font-size: 11px; line-height: 1.5; white-space: pre; }
+        .done { display: block; width: 100%; margin-top: 20px; padding: 14px; border-radius: 12px; background: #0f766e; color: white; text-align: center; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Setup Firebase Warung Scan</h1>
+        <p>Dapat dilakukan seluruhnya lewat browser di HP.</p>
+    </header>
+    <main>
+        <div class="notice">
+            Setelah selesai, gunakan <strong>satu email akun toko yang sama</strong> pada semua HP. Barang, transaksi, pelanggan, piutang, dan cicilan akan tersinkron otomatis. Saat internet putus, aplikasi tetap memakai data lokal.
+        </div>
+
+        <section class="step">
+            <h2>1. Buat project Firebase</h2>
+            <ol>
+                <li>Buka <a href="https://console.firebase.google.com/" target="_blank" rel="noopener">console.firebase.google.com</a> lalu masuk dengan akun Google.</li>
+                <li>Tekan <strong>Create a project / Buat project</strong>.</li>
+                <li>Nama project boleh <strong>warung-scan</strong>. Google Analytics boleh dimatikan agar lebih sederhana.</li>
+            </ol>
+        </section>
+
+        <section class="step">
+            <h2>2. Daftarkan aplikasi Web</h2>
+            <ol>
+                <li>Di halaman Overview, tekan ikon <strong>&lt;/&gt; Web</strong>.</li>
+                <li>Isi nama aplikasi <strong>Warung Scan</strong>. Firebase Hosting tidak perlu dicentang.</li>
+                <li>Tekan <strong>Register app</strong>.</li>
+                <li>Salin seluruh bagian <code>firebaseConfig</code> yang berisi apiKey, authDomain, projectId, dan appId.</li>
+                <li>Kembali ke Warung Scan → Pengaturan → Sinkronisasi Banyak HP, tempel pada kolom Konfigurasi Firebase Web, lalu tekan <strong>Simpan Konfigurasi</strong>.</li>
+            </ol>
+        </section>
+
+        <section class="step">
+            <h2>3. Buat Firestore Database</h2>
+            <ol>
+                <li>Firebase Console → menu <strong>Build → Firestore Database</strong>.</li>
+                <li>Tekan <strong>Create database</strong>, pilih Production mode.</li>
+                <li>Pilih lokasi terdekat dan lanjutkan sampai database dibuat.</li>
+                <li>Buka tab <strong>Rules</strong>, hapus isinya, lalu tempel aturan di bawah dan tekan <strong>Publish</strong>.</li>
+            </ol>
+            <pre>rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null
+                         &amp;&amp; request.auth.uid == userId;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}</pre>
+        </section>
+
+        <section class="step">
+            <h2>4. Aktifkan login Email/Password</h2>
+            <ol>
+                <li>Firebase Console → <strong>Build → Authentication</strong>.</li>
+                <li>Tekan <strong>Get started</strong>, buka tab Sign-in method.</li>
+                <li>Pilih <strong>Email/Password</strong>, aktifkan pilihan pertama, lalu Save.</li>
+                <li>Jika ada menu Authorized domains, tambahkan <code>irvan1406.github.io</code>.</li>
+            </ol>
+        </section>
+
+        <section class="step">
+            <h2>5. Buat akun toko di HP pertama</h2>
+            <ol>
+                <li>Buka kembali Warung Scan. Jika baru menyimpan konfigurasi, tunggu aplikasi memuat ulang.</li>
+                <li>Masuk ke Pengaturan → Sinkronisasi Banyak HP.</li>
+                <li>Isi email milik toko dan kata sandi minimal 6 karakter.</li>
+                <li>Tekan <strong>Buat Akun Pertama</strong> hanya sekali.</li>
+                <li>Tunggu sampai badge berubah menjadi <strong>Tersinkron</strong>.</li>
+            </ol>
+        </section>
+
+        <section class="step">
+            <h2>6. Hubungkan HP berikutnya</h2>
+            <ol>
+                <li>Pasang/buka Warung Scan di HP kedua.</li>
+                <li>Tempel konfigurasi Firebase Web yang sama dan simpan.</li>
+                <li>Isi email dan kata sandi akun toko yang sudah dibuat.</li>
+                <li>Tekan <strong>Masuk</strong>, bukan Buat Akun Pertama.</li>
+                <li>Tunggu badge Tersinkron. Data dari HP pertama akan muncul otomatis.</li>
+            </ol>
+        </section>
+
+        <div class="notice warning">
+            <strong>Penting:</strong> jangan kirim kata sandi, private key, Server Key, atau file akun layanan kepada siapa pun. Konfigurasi Firebase Web memang digunakan oleh aplikasi, tetapi keamanan data tetap bergantung pada Firestore Rules dan login akun toko.
+        </div>
+        <a class="done" href="index.html">Kembali ke Warung Scan</a>
+    </main>
+</body>
+</html>
