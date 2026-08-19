@@ -140,6 +140,7 @@ body {
 .native-file-picker input[type="file"] { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; opacity: 0.001; cursor: pointer; font-size: 0; }
 .compact-file-picker { flex: 0 0 auto; }
 .helper-text { color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.field-helper { margin-top: 8px; }
 .text-error { color: var(--brand-danger) !important; }
 .offscreen-reader { position: fixed; left: -10000px; top: 0; width: 320px; height: 240px; overflow: hidden; }
 
@@ -228,6 +229,78 @@ button:disabled { opacity: 0.55; cursor: wait; transform: none; }
 .camera-dialog { max-width: 520px; }
 .camera-video { display: block; width: 100%; min-height: 220px; max-height: 60vh; object-fit: cover; background: #111827; border-radius: var(--radius-md); }
 
+/* SCANNER FORM BARANG */
+.scanner-dialog { max-width: 520px; text-align: center; }
+.scanner-modal-icon {
+    width: 48px; height: 48px; margin: 0 auto 12px; border-radius: 15px;
+    display: flex; align-items: center; justify-content: center;
+    background: #ecfdf5; color: var(--brand-primary);
+}
+.scanner-box-modal { min-height: 280px; border: 3px solid #d1fae5; }
+.scanner-inline-message { min-height: 20px; margin-top: 12px; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.modal-single-action { width: 100%; margin-top: 14px; }
+
+/* TEMPLATE STRUK */
+.receipt-template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.receipt-template-option {
+    min-height: 74px; padding: 12px; border: 1px solid var(--border-line); border-radius: var(--radius-md);
+    background: var(--bg-main); color: var(--text-dark); align-items: flex-start; flex-direction: column; gap: 4px;
+    text-align: left;
+}
+.receipt-template-option strong { font-size: 13px; }
+.receipt-template-option span { color: var(--text-muted); font-size: 10px; font-weight: 500; }
+.receipt-template-option.is-active {
+    background: #ecfdf5; color: var(--brand-primary); border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(17, 94, 89, 0.08);
+}
+.receipt-preview-card { margin-top: 18px; padding: 14px; border-radius: var(--radius-md); background: #f3f4f6; }
+.receipt-preview-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.receipt-preview-heading span { font-size: 12px; font-weight: 800; color: var(--text-dark); }
+.receipt-preview-heading small { padding: 3px 7px; border-radius: 20px; background: white; color: var(--text-muted); font-size: 9px; font-weight: 700; }
+.receipt-mini-preview {
+    max-height: 270px; overflow: auto; padding: 14px 10px; border-radius: 8px; background: white;
+    color: #111; font-family: 'Courier New', Courier, monospace; font-size: 10px; line-height: 1.35;
+    white-space: pre-wrap; box-shadow: inset 0 0 0 1px #e5e7eb;
+}
+.data-transfer-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0 10px; color: var(--text-muted); }
+.data-transfer-divider::before, .data-transfer-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-line); }
+.data-transfer-divider span { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+.csv-template-button { margin: 12px auto 0; }
+
+/* NOTIFIKASI & DIALOG APLIKASI */
+.app-toast-container {
+    position: fixed; z-index: 300; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom));
+    width: min(calc(100% - 28px), 430px); transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: stretch; gap: 8px; pointer-events: none;
+}
+.app-toast {
+    display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px;
+    padding: 12px 14px; border-radius: 16px; background: #111827; color: white;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.28); animation: toastIn 0.24s ease-out;
+}
+.app-toast.is-leaving { animation: toastOut 0.2s ease-in forwards; }
+.app-toast-icon { width: 34px; height: 34px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+.app-toast-message { font-size: 12px; font-weight: 600; line-height: 1.45; }
+.app-toast-close { min-width: 28px; min-height: 28px; padding: 0; background: transparent; color: rgba(255,255,255,0.7); font-size: 20px; pointer-events: auto; }
+.app-toast-success .app-toast-icon { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+.app-toast-error .app-toast-icon { background: rgba(239,68,68,0.2); color: #fca5a5; }
+.app-toast-warning .app-toast-icon { background: rgba(245,158,11,0.2); color: #fcd34d; }
+.app-toast-info .app-toast-icon { background: rgba(59,130,246,0.2); color: #93c5fd; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(18px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes toastOut { to { opacity: 0; transform: translateY(12px) scale(0.98); } }
+
+.app-dialog-backdrop { z-index: 220; align-items: center; }
+.app-dialog-card { max-width: 360px; border-radius: 24px; text-align: center; transform: scale(0.92); animation: dialogPop 0.22s ease-out forwards; }
+@keyframes dialogPop { to { transform: scale(1); } }
+.app-dialog-icon {
+    width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 17px;
+    display: flex; align-items: center; justify-content: center; background: #ecfdf5; color: var(--brand-primary);
+    font-size: 22px; font-weight: 900;
+}
+.app-dialog-message { color: var(--text-muted); font-size: 13px; line-height: 1.6; white-space: pre-line; }
+.app-dialog-input { display: none; margin-top: 16px; text-align: center; font-size: 18px; font-weight: 700; }
+.app-dialog-actions.is-single { grid-template-columns: 1fr; }
+
 /* STATUS BADGE */
 .status-badge { padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 700; text-align: center; margin-top: 8px; }
 .status-offline { background: #fee2e2; color: #b91c1c; }
@@ -260,6 +333,7 @@ button:disabled { opacity: 0.55; cursor: wait; transform: none; }
     .dashboard-panel-header .btn-pill-light { white-space: nowrap; }
     .catalog-filters { grid-template-columns: 1fr; }
     .catalog-filters #search-input { grid-column: auto; }
+    .scanner-box-modal { min-height: 245px; }
 }
 
 /* AREA PRINT FALLBACK */

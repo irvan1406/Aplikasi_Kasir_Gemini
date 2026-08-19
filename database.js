@@ -10,13 +10,21 @@ const DB = (() => {
         autoPrint: false,
         printMode: 'rawbt',
         logoBase64: '',
+        receiptTemplate: 'classic',
         headerText: 'WARUNGSCAN',
+        storeAddress: '',
+        storePhone: '',
         footerText: 'Terima Kasih',
         adminPin: ''
     };
 
     function clone(value) {
         return JSON.parse(JSON.stringify(value));
+    }
+
+    function notify(message, type = 'error') {
+        if (typeof window.showAppToast === 'function') window.showAppToast(message, type, 4500);
+        else console.warn(message);
     }
 
     function safeRead(key, fallback) {
@@ -39,7 +47,7 @@ const DB = (() => {
         } catch (error) {
             console.error(`Gagal menyimpan ${key}.`, error);
             if (showAlert) {
-                alert('Gagal menyimpan data. Penyimpanan perangkat mungkin penuh. Hapus foto besar atau ekspor lalu bersihkan data lama.');
+                notify('Gagal menyimpan data. Penyimpanan perangkat mungkin penuh. Ekspor backup lalu hapus foto atau data lama.');
             }
             return false;
         }
@@ -156,7 +164,7 @@ const DB = (() => {
             } catch (restoreError) {
                 console.error('Pemulihan data gagal.', restoreError);
             }
-            alert('Transaksi belum tersimpan karena penyimpanan perangkat penuh. Keranjang tidak dihapus.');
+            notify('Transaksi belum tersimpan karena penyimpanan perangkat penuh. Keranjang tidak dihapus.');
             return false;
         }
     }
@@ -177,7 +185,7 @@ const DB = (() => {
 
     function exportData() {
         return JSON.stringify({
-            version: 2,
+            version: 3,
             exportedAt: new Date().toISOString(),
             products: getProducts(),
             history: getHistory(),

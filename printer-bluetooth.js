@@ -13,6 +13,11 @@ let printCharacteristic = null;
 let nativePrinterConnected = false;
 const nativePrinterRequests = new Map();
 
+function notifyPrinter(message, type = 'error') {
+    if (typeof window.showAppToast === 'function') window.showAppToast(message, type, 4500);
+    else console.warn(message);
+}
+
 function getNativePrinterBridge() {
     try {
         return window.WarungScanNative || null;
@@ -141,13 +146,13 @@ async function connectBluetoothPrinter() {
             nativePrinterConnected = false;
             console.error('Gagal menghubungkan printer native.', error);
             updatePrinterStatus('RPP02N belum terhubung', false);
-            alert(`Gagal konek RPP02N: ${error.message}`);
+            notifyPrinter(`Gagal konek RPP02N: ${error.message}`);
             return false;
         }
     }
 
     if (!navigator.bluetooth) {
-        alert('Web Bluetooth tidak tersedia di browser/APK ini. Pilih mode RawBT pada pengaturan printer.');
+        notifyPrinter('Web Bluetooth tidak tersedia. Pilih Bluetooth Langsung RPP02N atau RawBT.');
         updatePrinterStatus('Web Bluetooth tidak didukung', false);
         return false;
     }
@@ -175,7 +180,7 @@ async function connectBluetoothPrinter() {
     } catch (error) {
         console.error('Gagal menghubungkan printer Bluetooth.', error);
         updatePrinterStatus('Printer belum terhubung', false);
-        if (error.name !== 'NotFoundError') alert(`Gagal konek Bluetooth: ${error.message}`);
+        if (error.name !== 'NotFoundError') notifyPrinter(`Gagal konek Bluetooth: ${error.message}`);
         return false;
     }
 }
@@ -278,7 +283,7 @@ async function connectAndPrintBluetooth(customReceiptText, logoBase64) {
             nativePrinterConnected = false;
             console.error('Gagal mencetak melalui Android native.', error);
             updatePrinterStatus('Gagal mencetak ke RPP02N', false);
-            alert(`Gagal print: ${error.message}`);
+            notifyPrinter(`Gagal print: ${error.message}`);
             return false;
         }
     }
@@ -306,7 +311,7 @@ async function connectAndPrintBluetooth(customReceiptText, logoBase64) {
     } catch (error) {
         console.error('Gagal mencetak melalui Bluetooth.', error);
         updatePrinterStatus('Gagal mencetak melalui Bluetooth', false);
-        alert(`Gagal print: ${error.message}`);
+        notifyPrinter(`Gagal print: ${error.message}`);
         return false;
     }
 }

@@ -6,7 +6,7 @@
     <title>Warung Scan</title>
     <!-- Import Font Modern dari Google -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=3">
     <script src="vendor/html5-qrcode.min.js" type="text/javascript"></script>
 </head>
 <body>
@@ -194,11 +194,12 @@
             <label class="input-label">Barcode</label>
             <div class="search-box">
                 <input type="text" id="input-barcode" class="modern-input" placeholder="Scan / ketik barcode">
-                <div class="btn-light native-file-picker compact-file-picker">
-                    Scan Foto
-                    <input type="file" id="product-barcode-file-input" accept="image/jpeg,image/png,image/webp" aria-label="Pilih foto barcode barang" onchange="scanProductBarcodeFromFile(this)">
-                </div>
+                <button type="button" class="btn-light compact-file-picker" onclick="openProductBarcodeScanner()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v4M3 5h4M21 5v4M21 5h-4M3 19v-4M3 19h4M21 19v-4M21 19h-4"/><path d="M7 9v6M10 9v6M14 9v6M17 9v6"/></svg>
+                    Scan Kamera
+                </button>
             </div>
+            <p class="helper-text field-helper">Kamera akan membaca barcode langsung dan mengisi nomor secara otomatis.</p>
 
             <label class="input-label">Nama Barang <span class="required">*</span></label>
             <input type="text" id="input-nama" class="modern-input" placeholder="Misal: Indomie Goreng">
@@ -371,17 +372,39 @@
                 </select>
             </div>
 
+            <label class="input-label">Pilih Template Struk</label>
+            <div class="receipt-template-grid" role="radiogroup" aria-label="Template struk">
+                <button type="button" class="receipt-template-option" data-receipt-template="classic" onclick="selectReceiptTemplate('classic')">
+                    <strong>Klasik</strong><span>Rapi dan familiar</span>
+                </button>
+                <button type="button" class="receipt-template-option" data-receipt-template="compact" onclick="selectReceiptTemplate('compact')">
+                    <strong>Ringkas</strong><span>Hemat kertas</span>
+                </button>
+                <button type="button" class="receipt-template-option" data-receipt-template="modern" onclick="selectReceiptTemplate('modern')">
+                    <strong>Modern</strong><span>Informasi seimbang</span>
+                </button>
+                <button type="button" class="receipt-template-option" data-receipt-template="detailed" onclick="selectReceiptTemplate('detailed')">
+                    <strong>Detail</strong><span>Termasuk barcode</span>
+                </button>
+            </div>
+
             <label class="input-label">Nama Toko (Header)</label>
             <input type="text" id="template-header" class="modern-input" placeholder="WARUNGSCAN" oninput="saveSettings()">
+
+            <label class="input-label">Alamat Toko <span class="optional-label">Opsional</span></label>
+            <input type="text" id="template-address" class="modern-input" placeholder="Alamat toko" oninput="saveSettings()">
+
+            <label class="input-label">Nomor Telepon <span class="optional-label">Opsional</span></label>
+            <input type="text" id="template-phone" class="modern-input" placeholder="08xxxxxxxxxx" oninput="saveSettings()">
 
             <label class="input-label">Catatan Bawah (Footer)</label>
             <input type="text" id="template-footer" class="modern-input" placeholder="Terima Kasih" oninput="saveSettings()">
 
-            <label class="input-label">Logo Toko (Monokrom)</label>
-            <p class="helper-text" style="margin-bottom: 8px;">Logo dicetak langsung pada mode Bluetooth RPP02N atau Browser. Mode RawBT mengirim teks struk.</p>
+            <label class="input-label">Logo Toko</label>
+            <p class="helper-text" style="margin-bottom: 8px;">Mendukung PNG transparan, JPG, dan WEBP. Logo tercetak pada mode Bluetooth RPP02N atau Browser.</p>
             <div class="photo-upload-group">
                 <div class="btn-outline native-file-picker">
-                    Pilih Logo
+                    Pilih Logo PNG
                     <input type="file" id="setting-logo" accept="image/jpeg,image/png,image/webp" aria-label="Pilih logo toko" onchange="handleLogoUpload()">
                 </div>
                 <button type="button" onclick="hapusLogo()" class="btn-danger" style="flex: 0.5;">Hapus</button>
@@ -389,6 +412,14 @@
             
             <div class="photo-preview" id="preview-logo-container" style="display: none; justify-content: center;">
                 <img id="preview-logo" src="" style="max-width: 120px;">
+            </div>
+
+            <div class="receipt-preview-card">
+                <div class="receipt-preview-heading">
+                    <span>Contoh Template</span>
+                    <small>58 mm</small>
+                </div>
+                <pre id="receipt-template-preview" class="receipt-mini-preview"></pre>
             </div>
         </div>
 
@@ -400,15 +431,25 @@
         </div>
 
         <div class="card-container" style="margin-top: 16px;">
-            <h3 class="section-title">Backup Data</h3>
-            <p class="helper-text" style="margin-bottom: 12px;">Simpan salinan barang, riwayat, foto, dan pengaturan sebelum menghapus data aplikasi.</p>
+            <h3 class="section-title">Backup & Transfer Data</h3>
+            <p class="helper-text" style="margin-bottom: 12px;">Backup JSON menyimpan barang, riwayat, foto, logo, template, dan pengaturan secara lengkap.</p>
             <div class="backup-actions">
-                <button onclick="exportBackup()" class="btn-primary">Ekspor Backup</button>
+                <button onclick="exportBackup()" class="btn-primary">Ekspor Backup Lengkap</button>
                 <div class="btn-outline native-file-picker">
-                    Impor Backup
+                    Impor Backup Lengkap
                     <input type="file" id="backup-file-input" accept="application/json,.json" aria-label="Pilih file backup" onchange="importBackup(this)">
                 </div>
             </div>
+            <div class="data-transfer-divider"><span>Transfer produk antar aplikasi</span></div>
+            <p class="helper-text" style="margin-bottom: 12px;">CSV memakai kolom umum: barcode, nama, kategori, harga beli, harga jual, stok, dan satuan.</p>
+            <div class="backup-actions">
+                <button onclick="exportProductsCsv()" class="btn-outline">Ekspor Produk CSV</button>
+                <div class="btn-outline native-file-picker">
+                    Impor Produk CSV
+                    <input type="file" id="product-csv-input" accept="text/csv,.csv" aria-label="Pilih file CSV produk" onchange="importProductsCsv(this)">
+                </div>
+            </div>
+            <button onclick="downloadProductCsvTemplate()" class="btn-pill-light csv-template-button">Unduh Contoh Format CSV</button>
         </div>
     </main>
 
@@ -422,6 +463,20 @@
                 <button onclick="closeProductCamera()" class="btn-light">Batal</button>
                 <button onclick="captureProductCamera()" class="btn-primary">Jepret Foto</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Scanner barcode khusus form tambah barang. -->
+    <div id="product-barcode-modal" class="modal-backdrop">
+        <div class="modal-dialog scanner-dialog">
+            <div class="scanner-modal-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v4M3 5h4M21 5v4M21 5h-4M3 19v-4M3 19h4M21 19v-4M21 19h-4"/><path d="M7 9v6M10 9v6M14 9v6M17 9v6"/></svg>
+            </div>
+            <h3 class="modal-title">Scan Barcode Barang</h3>
+            <p class="modal-subtitle">Arahkan kamera belakang ke barcode sampai terbaca otomatis.</p>
+            <div id="product-barcode-reader" class="scanner-box scanner-box-modal"></div>
+            <p id="product-barcode-message" class="scanner-inline-message">Membuka kamera…</p>
+            <button type="button" onclick="closeProductBarcodeScanner()" class="btn-light modal-single-action">Batal</button>
         </div>
     </div>
 
@@ -465,14 +520,29 @@
         </div>
     </div>
 
+    <!-- Dialog dan notifikasi milik aplikasi; tidak menampilkan alamat GitHub. -->
+    <div id="app-dialog" class="modal-backdrop app-dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="app-dialog-title">
+        <div class="modal-dialog app-dialog-card">
+            <div id="app-dialog-icon" class="app-dialog-icon">✓</div>
+            <h3 id="app-dialog-title" class="modal-title">Warung Scan</h3>
+            <p id="app-dialog-message" class="app-dialog-message"></p>
+            <input id="app-dialog-input" class="modern-input app-dialog-input" type="text" style="display: none;">
+            <div class="modal-actions app-dialog-actions">
+                <button id="app-dialog-cancel" type="button" class="btn-light">Batal</button>
+                <button id="app-dialog-confirm" type="button" class="btn-primary">Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+    <div id="app-toast-container" class="app-toast-container" aria-live="polite" aria-atomic="true"></div>
+
     <!-- Area Print Fallback (Disembunyikan) -->
     <div id="print-area">
         <img id="print-area-logo" src="" style="width: 100%; max-width: 200px; display: none; margin: 0 auto;">
         <pre id="print-raw-text"></pre>
     </div>
 
-    <script src="database.js"></script>
-    <script src="printer-bluetooth.js"></script>
-    <script src="app.js"></script>
+    <script src="database.js?v=3"></script>
+    <script src="printer-bluetooth.js?v=3"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>
