@@ -7,7 +7,7 @@
     <title>Warung Scan</title>
     <!-- Import Font Modern dari Google -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
     <script src="vendor/html5-qrcode.min.js" type="text/javascript"></script>
 </head>
 <body>
@@ -388,15 +388,55 @@
             <div id="status-printer" class="status-badge status-offline">Mode RawBT siap digunakan</div>
         </div>
 
-        <div class="card-container" style="margin-top: 16px;">
+        <div class="card-container qris-settings-card" style="margin-top: 16px;">
             <div class="section-header-plain">
                 <div>
                     <h3 class="section-title" style="margin-bottom: 3px;">Pembayaran QRIS</h3>
-                    <p class="helper-text">QRIS utama yang ditampilkan kepada pembeli.</p>
+                    <p class="helper-text">Gunakan QRIS Midtrans otomatis atau gambar QRIS statis sebagai cadangan.</p>
                 </div>
-                <span class="qris-ready-badge">Siap</span>
+                <span id="qris-integration-badge" class="qris-ready-badge">Manual</span>
             </div>
 
+            <label class="input-label">Mode QRIS</label>
+            <select id="setting-qris-mode" class="modern-input" onchange="saveSettings(); updateQrisIntegrationUI()">
+                <option value="manual">QRIS Statis / Konfirmasi Manual</option>
+                <option value="midtrans">Midtrans Otomatis</option>
+            </select>
+
+            <div id="midtrans-settings-panel" class="midtrans-settings-panel" style="display: none;">
+                <div class="midtrans-panel-heading">
+                    <div>
+                        <strong>Midtrans Otomatis</strong>
+                        <small>QR dinamis sesuai total dan cetak struk setelah status berhasil.</small>
+                    </div>
+                    <span id="midtrans-connection-dot" class="connection-dot"></span>
+                </div>
+
+                <label class="input-label">URL Backend Vercel</label>
+                <input type="url" id="setting-midtrans-backend-url" class="modern-input" placeholder="https://warung-scan.vercel.app" onchange="saveSettings(); updateQrisIntegrationUI()">
+
+                <label class="input-label">Token Aplikasi</label>
+                <div class="token-input-row">
+                    <input type="password" id="setting-midtrans-app-token" class="modern-input" placeholder="Sama dengan WARUNGSCAN_APP_TOKEN" autocomplete="off" spellcheck="false" oninput="saveMidtransAppToken()">
+                    <button type="button" onclick="prepareMidtransAppToken()" class="btn-light">Buat / Salin</button>
+                </div>
+                <p class="helper-text field-helper">Token hanya disimpan di HP ini dan tidak ikut backup. Jangan masukkan Server Key Midtrans di sini.</p>
+
+                <label class="input-label">Alamat Webhook Midtrans</label>
+                <div class="webhook-copy-box">
+                    <code id="setting-midtrans-webhook-url">Isi URL backend terlebih dahulu</code>
+                    <button type="button" onclick="copyMidtransWebhookUrl()">Salin</button>
+                </div>
+
+                <div class="midtrans-actions">
+                    <button type="button" onclick="testMidtransConnection()" class="btn-primary">Tes Koneksi Midtrans</button>
+                    <a href="https://github.com/irvan1406/Aplikasi_Kasir_Gemini#setup-midtrans-otomatis" target="_blank" rel="noopener" class="btn-link-guide">Panduan Setup</a>
+                </div>
+                <div id="midtrans-connection-status" class="integration-status is-idle">Backend belum diuji.</div>
+                <p class="helper-text qris-api-note"><strong>Server Key aman:</strong> simpan sebagai Environment Variable <code>MIDTRANS_SERVER_KEY</code> di Vercel, bukan di GitHub dan bukan di aplikasi.</p>
+            </div>
+
+            <div class="data-transfer-divider qris-fallback-divider"><span>QRIS statis / cadangan</span></div>
             <label class="input-label">Nama Merchant</label>
             <input type="text" id="setting-qris-merchant" class="modern-input" placeholder="AL - STORE" oninput="saveSettings()">
 
@@ -408,13 +448,13 @@
 
             <div class="photo-upload-group">
                 <div class="btn-outline native-file-picker">
-                    Ganti Gambar QRIS
+                    Upload / Ganti QRIS
                     <input type="file" id="setting-qris-file" accept="image/jpeg,image/png,image/webp" aria-label="Pilih gambar QRIS" onchange="handleQrisUpload()">
                 </div>
                 <button type="button" onclick="restoreDefaultQris()" class="btn-light">Pakai QRIS Awal</button>
             </div>
             <button type="button" onclick="printStoredQris()" class="btn-primary" style="width: 100%;">🖨️ Cetak QRIS Sekarang</button>
-            <p class="helper-text qris-api-note">Pengecekan dana otomatis membutuhkan API dari penyedia QRIS. Tanpa API, cek notifikasi dana masuk lalu konfirmasi pada layar pembayaran.</p>
+            <p class="helper-text qris-api-note">QRIS statis tetap tersedia jika backend Midtrans sedang tidak aktif.</p>
         </div>
 
         <div class="card-container" style="margin-top: 16px;">
@@ -564,15 +604,27 @@
 
             <div id="qris-payment-panel" style="display: none;">
                 <div class="qris-payment-card">
-                    <span class="qris-label">QRIS</span>
+                    <span id="qris-payment-mode-badge" class="qris-label">QRIS</span>
                     <strong id="qris-payment-merchant">AL - STORE</strong>
                     <img id="qris-payment-image" alt="QRIS pembayaran">
+                    <div id="qris-image-placeholder" class="qris-image-placeholder" style="display: none;">Tekan “Buat QRIS Midtrans” untuk membuat kode pembayaran sesuai total.</div>
                     <span>Total yang harus dibayar</span>
                     <strong id="qris-payment-total">Rp 0</strong>
-                    <small>Pembeli memindai QR lalu memasukkan total di atas.</small>
+                    <small id="qris-payment-instruction">Pembeli memindai QR lalu memasukkan total di atas.</small>
                 </div>
-                <button type="button" onclick="printCurrentQris()" class="btn-outline qris-print-button">🖨️ Cetak QRIS untuk Pembeli</button>
-                <p class="qris-confirm-note">Pastikan dana sudah terlihat masuk di aplikasi bank/merchant sebelum menekan tombol konfirmasi.</p>
+                <div id="qris-auto-status" class="qris-auto-status is-idle">
+                    <span class="qris-status-pulse"></span>
+                    <div>
+                        <strong id="qris-status-title">QRIS statis siap</strong>
+                        <small id="qris-status-detail">Konfirmasi dana secara manual setelah pembayaran masuk.</small>
+                    </div>
+                </div>
+                <div class="qris-payment-actions">
+                    <button id="qris-print-button" type="button" onclick="printCurrentQris()" class="btn-outline qris-print-button">🖨️ Cetak QRIS</button>
+                    <button id="qris-check-button" type="button" onclick="checkMidtransPaymentNow()" class="btn-outline qris-check-button" style="display: none;">↻ Cek Status</button>
+                    <button id="qris-cancel-button" type="button" onclick="cancelPendingMidtransPayment()" class="btn-light qris-cancel-button" style="display: none;">Batalkan QRIS</button>
+                </div>
+                <p id="qris-confirm-note" class="qris-confirm-note">Pastikan dana sudah terlihat masuk di aplikasi bank/merchant sebelum menekan tombol konfirmasi.</p>
             </div>
 
             <div class="modal-actions">
@@ -618,8 +670,8 @@
         <pre id="print-raw-text"></pre>
     </div>
 
-    <script src="database.js?v=4"></script>
-    <script src="printer-bluetooth.js?v=4"></script>
-    <script src="app.js?v=4"></script>
+    <script src="database.js?v=5"></script>
+    <script src="printer-bluetooth.js?v=5"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>

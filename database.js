@@ -3,7 +3,8 @@ const DB = (() => {
     const KEYS = {
         products: 'kasir_products',
         history: 'kasir_history',
-        settings: 'kasir_settings'
+        settings: 'kasir_settings',
+        pendingMidtrans: 'kasir_pending_midtrans'
     };
 
     const defaultSettings = {
@@ -14,6 +15,8 @@ const DB = (() => {
         displayMode: 'light',
         qrisMerchantName: 'AL - STORE',
         qrisImageBase64: '',
+        qrisMode: 'manual',
+        midtransBackendUrl: '',
         lastPaymentMethod: 'cash',
         receiptTemplate: 'classic',
         headerText: 'WARUNGSCAN',
@@ -194,9 +197,43 @@ const DB = (() => {
         return write(KEYS.settings, { ...defaultSettings, ...(settingsObj || {}) });
     }
 
+    function getPendingMidtransPayment() {
+        const payment = safeRead(KEYS.pendingMidtrans, null);
+        if (!payment || typeof payment !== 'object') return null;
+        const orderId = String(payment.orderId || '').trim();
+        const amount = Math.max(0, Number(payment.amount) || 0);
+        if (!orderId || !amount || !Array.isArray(payment.items)) return null;
+        return {
+            ...payment,
+            orderId,
+            transactionId: String(payment.transactionId || ''),
+            amount,
+            qrImage: typeof payment.qrImage === 'string' ? payment.qrImage : '',
+            qrUrl: typeof payment.qrUrl === 'string' ? payment.qrUrl : '',
+            expiryTime: String(payment.expiryTime || ''),
+            status: String(payment.status || 'pending'),
+            createdAt: Number(payment.createdAt) || Date.now(),
+            items: payment.items.map(normalizeProductItem)
+        };
+    }
+
+    function savePendingMidtransPayment(payment) {
+        return write(KEYS.pendingMidtrans, payment, false);
+    }
+
+    function clearPendingMidtransPayment() {
+        try {
+            localStorage.removeItem(KEYS.pendingMidtrans);
+            return true;
+        } catch (error) {
+            console.error('Gagal membersihkan transaksi Midtrans tertunda.', error);
+            return false;
+        }
+    }
+
     function exportData() {
         return JSON.stringify({
-            version: 4,
+            version: 5,
             exportedAt: new Date().toISOString(),
             products: getProducts(),
             history: getHistory(),
@@ -240,6 +277,9 @@ const DB = (() => {
         clearHistory,
         getSettings,
         saveSettings,
+        getPendingMidtransPayment,
+        savePendingMidtransPayment,
+        clearPendingMidtransPayment,
         exportData,
         importData
     };
