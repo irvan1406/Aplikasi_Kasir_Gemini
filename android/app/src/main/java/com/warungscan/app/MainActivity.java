@@ -102,7 +102,9 @@ public class MainActivity extends Activity {
         root.addView(progressBar, progressLayout);
         setContentView(root);
 
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
+        boolean isDebuggable = (getApplicationInfo().flags
+                & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        WebView.setWebContentsDebuggingEnabled(isDebuggable);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
